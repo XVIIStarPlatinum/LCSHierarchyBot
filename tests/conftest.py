@@ -8,6 +8,14 @@ from config import OWNER_ID, OWNER_USERNAME
 from database import Database
 
 
+def ensure_directories():
+    directories = ['logs', 'database']
+    for directory in directories:
+        os.makedirs(directory, exist_ok=True)
+
+ensure_directories()
+
+
 @pytest.fixture(scope="function")
 def test_db_path(tmp_path) -> str:
     """

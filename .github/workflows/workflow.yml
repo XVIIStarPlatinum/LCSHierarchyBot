@@ -16,7 +16,7 @@ jobs:
     env:
       BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
-      DATABASE_PATH: ${{ secrets.DATABASE.PATH }}
+      DATABASE_PATH: ${{ secrets.DATABASE_PATH }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
       TOPIC_ID: ${{ secrets.TOPIC_ID }}
       TOPIC_IMPORTANT_ID: ${{ secrets.TOPIC_IMPORTANT_ID }}
@@ -63,6 +63,11 @@ jobs:
       - name: Formatting (black)
         run: |
           black --check .
+
+      - name: Create necessary directories
+        run: |
+          mkdir -p logs
+          mkdir -p database
 
       - name: Run unit tests
         run: |
