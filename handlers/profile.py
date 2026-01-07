@@ -89,18 +89,24 @@ async def handle_start_command(
         is_admin = await db.is_admin(user.id)
 
         if is_owner:
-            welcome_prefix = ("🎉 <b>Добро пожаловать, создатель сообщества! "
-                              "Доступны команды: /profile, /top, /add, /legend, "
-                              "/unlegend, /setadmin, /unsetadmin, /admins, /reset, "
-                              "/@username.</b>")
+            welcome_prefix = (
+                "🎉 <b>Добро пожаловать, создатель сообщества! "
+                "Доступны команды: /profile, /top, /add, /legend, "
+                "/unlegend, /setadmin, /unsetadmin, /admins, /reset, "
+                "/@username.</b>"
+            )
         elif is_admin:
-            welcome_prefix = ("🎉 <b>Привет, админ! Управляй сообществом с помощью "
-                              "команд: /profile, /top, /add, "
-                              "/admins, /reset, /@username.</b>")
+            welcome_prefix = (
+                "🎉 <b>Привет, админ! Управляй сообществом с помощью "
+                "команд: /profile, /top, /add, "
+                "/admins, /reset, /@username.</b>"
+            )
         else:
-            welcome_prefix = ("🎉 <b>Добро пожаловать в сообщество! Используй /profile"
-                              " для просмотра статуса, /top для рейтинга. Будь активным"
-                              " и повышай свой ранг!</b>")
+            welcome_prefix = (
+                "🎉 <b>Добро пожаловать в сообщество! Используй /profile"
+                " для просмотра статуса, /top для рейтинга. Будь активным"
+                " и повышай свой ранг!</b>"
+            )
         welcome_message = welcome_prefix + (
             "\n\n"
             "🤖 Я - бот-калькулятор, который помогает отслеживать "
@@ -372,8 +378,10 @@ async def handle_top_command(
 
         top_text += f"{medal}{i}. @{username} - {points:.1f} баллов\n"
 
-    cache_info = ("\n<i>Обновление: каждые 10 минут для участников, "
-                  "мгновенно для админов и владельца</i>")
+    cache_info = (
+        "\n<i>Обновление: каждые 10 минут для участников, "
+        "мгновенно для админов и владельца</i>"
+    )
     top_text += cache_info
 
     await message.reply_text(top_text, parse_mode="HTML")

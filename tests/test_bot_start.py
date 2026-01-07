@@ -6,8 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from config import (LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID,
-                    TELEGRAM_TOKEN)
+from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID, TELEGRAM_TOKEN
 
 # Исправление кодировки для Windows
 if sys.platform.startswith("win"):
@@ -15,11 +14,7 @@ if sys.platform.startswith("win"):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 # Настройка логирования
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format=LOG_FORMAT,
-    encoding=LOG_ENCODING
-)
+logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT, encoding=LOG_ENCODING)
 logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = TELEGRAM_TOKEN
@@ -61,10 +56,7 @@ async def test_start_command_workflow():
         supports_inline_queries=True,
     )
 
-    mock_chat = Chat(
-        id=OWNER_ID,
-        type="private"
-    )
+    mock_chat = Chat(id=OWNER_ID, type="private")
 
     mock_message = Message(
         message_id=1,
@@ -74,10 +66,7 @@ async def test_start_command_workflow():
         from_user=mock_user,
     )
 
-    mock_update = Update(
-        update_id=1,
-        message=mock_message
-    )
+    mock_update = Update(update_id=1, message=mock_message)
 
     mock_context = ContextTypes.DEFAULT_TYPE(application=application)
 
@@ -98,14 +87,14 @@ async def test_start_command_workflow():
         # Эмулируем отправку ответа
         sent_message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Привет! Я бот LCS Hierarchy. Спасибо, что запустил меня!"
+            text="Привет! Я бот LCS Hierarchy. Спасибо, что запустил меня!",
         )
 
-        context.bot_data['bot_instance'].db.save_bot_message(
-            message_id = sent_message.message_id,
+        context.bot_data["bot_instance"].db.save_bot_message(
+            message_id=sent_message.message_id,
             chat_id=sent_message.chat_id,
             user_id=update.effective_user.id,
-            is_start_command=True
+            is_start_command=True,
         )
         return True
 
@@ -115,21 +104,21 @@ async def test_start_command_workflow():
         logger.info(f"Mock handler called successfully. Result: {result}")
         assert result is not False, "Mock handler returned False"
     except Exception as e:
-            logger.error(f"Error in mock handler of /start: {e}", exc_info=True)
-            raise
+        logger.error(f"Error in mock handler of /start: {e}", exc_info=True)
+        raise
+
 
 @pytest.mark.asyncio
 async def test_start_command_with_existing_user():
     """
-        Тест команды /start для существующего пользователя.
-        """
+    Тест команды /start для существующего пользователя.
+    """
     logger.info("Testing /start for existing user...")
 
+    from telegram import Chat, Message, Update, User
     from telegram.ext import Application, ContextTypes
-    from telegram import Update, Message, User, Chat
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
-    bot = application.bot
 
     # Создаем мок-объекты
     mock_user = User(
@@ -139,7 +128,7 @@ async def test_start_command_with_existing_user():
         username="owner_username",
         can_join_groups=True,
         can_read_all_group_messages=True,
-        supports_inline_queries=True
+        supports_inline_queries=True,
     )
 
     mock_chat = Chat(id=OWNER_ID, type="private")
@@ -149,7 +138,7 @@ async def test_start_command_with_existing_user():
         date=datetime.now(),
         chat=mock_chat,
         text="/start",
-        from_user=mock_user
+        from_user=mock_user,
     )
 
     mock_update = Update(update_id=1, message=mock_message)
@@ -158,20 +147,20 @@ async def test_start_command_with_existing_user():
     # Настраиваем мок БД - пользователь уже существует
     mock_db = MagicMock()
     mock_db.get_user.return_value = {
-        'user_id': OWNER_ID,
-        'username': 'owner_username',
-        'rank': 'Легенда',
-        'points': 9999.0
+        "user_id": OWNER_ID,
+        "username": "owner_username",
+        "rank": "Легенда",
+        "points": 9999.0,
     }
     mock_db.is_admin.return_value = True
     mock_db.save_bot_message.return_value = True
 
-    mock_context.bot_data['bot_instance'] = MagicMock()
-    mock_context.bot_data['bot_instance'].db = mock_db
+    mock_context.bot_data["bot_instance"] = MagicMock()
+    mock_context.bot_data["bot_instance"].db = mock_db
 
     # Обработчик для существующего пользователя
     async def mock_start_command_existing(update, context):
-        user = context.bot_data['bot_instance'].db.get_user(update.effective_user.id)
+        user = context.bot_data["bot_instance"].db.get_user(update.effective_user.id)
 
         if user:
             text = f"С возвращением! Ваш ранг: {user['rank']}, баллы: {user['points']}"
@@ -179,8 +168,7 @@ async def test_start_command_with_existing_user():
             text = "Привет! Вы новый пользователь."
 
         sent_message = await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=text
+            chat_id=update.effective_chat.id, text=text
         )
         return sent_message is not None
 
@@ -203,8 +191,8 @@ async def test_start_command_database_operations():
     """
     logger.info("Testing /start database operations...")
 
+    from telegram import Chat, Message, Update, User
     from telegram.ext import Application, ContextTypes
-    from telegram import Update, Message, User, Chat
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
@@ -216,7 +204,7 @@ async def test_start_command_database_operations():
         username="testuser",
         can_join_groups=True,
         can_read_all_group_messages=True,
-        supports_inline_queries=True
+        supports_inline_queries=True,
     )
 
     mock_chat = Chat(id=new_user_id, type="private")
@@ -226,7 +214,7 @@ async def test_start_command_database_operations():
         date=datetime.now(),
         chat=mock_chat,
         text="/start",
-        from_user=mock_user
+        from_user=mock_user,
     )
 
     mock_update = Update(update_id=1, message=mock_message)
@@ -238,12 +226,12 @@ async def test_start_command_database_operations():
     mock_db.save_bot_message.return_value = True
     mock_db.is_admin.return_value = False
 
-    mock_context.bot_data['bot_instance'] = MagicMock()
-    mock_context.bot_data['bot_instance'].db = mock_db
+    mock_context.bot_data["bot_instance"] = MagicMock()
+    mock_context.bot_data["bot_instance"].db = mock_db
 
     # Обработчик с операциями БД
     async def mock_start_with_db(update, context):
-        db = context.bot_data['bot_instance'].db
+        db = context.bot_data["bot_instance"].db
         user_id = update.effective_user.id
         username = update.effective_user.username
 
@@ -256,15 +244,14 @@ async def test_start_command_database_operations():
 
         # Отправляем сообщение
         sent_message = await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Добро пожаловать!"
+            chat_id=update.effective_chat.id, text="Добро пожаловать!"
         )
 
         db.save_bot_message(
             message_id=sent_message.message_id,
             chat_id=sent_message.chat_id,
             user_id=user_id,
-            is_start_command=True
+            is_start_command=True,
         )
 
         return True

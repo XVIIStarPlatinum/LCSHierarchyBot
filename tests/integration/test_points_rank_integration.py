@@ -232,10 +232,10 @@ class TestPointsRankIntegration:
             ), f"Ранг {rank_name} должен иметь минимум {min_privileges} привилегий"
 
             if min_restrictions > 0:
-                assert (
-                    len(restrictions) >= min_restrictions
-                ), (f"Ранг {rank_name} должен иметь минимум "
-                    f"{min_restrictions} ограничений")
+                assert len(restrictions) >= min_restrictions, (
+                    f"Ранг {rank_name} должен иметь минимум "
+                    f"{min_restrictions} ограничений"
+                )
             else:
                 assert (
                     len(restrictions) == 0
@@ -333,7 +333,7 @@ class TestPointsRankIntegration:
             db.update_user_points(user_id, points)
 
             user = db.get_user(user_id)
-            assert (
-                user["rank"] == expected_rank
-            ), (f"При {points} баллах ранг должен быть "
-                f"{expected_rank}, но получен {user['rank']}")
+            assert user["rank"] == expected_rank, (
+                f"При {points} баллах ранг должен быть "
+                f"{expected_rank}, но получен {user['rank']}"
+            )

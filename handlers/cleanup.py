@@ -6,8 +6,7 @@ from telegram.error import TelegramError
 from telegram.ext import Application, ContextTypes
 from telegram.ext._utils.types import BD
 
-from config import (BOT_USERNAME, CHAT_ID, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL,
-                    OWNER_ID)
+from config import BOT_USERNAME, CHAT_ID, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID
 from utils.helpers import get_clean_rank, notify_owner_error
 
 logging.basicConfig(
@@ -159,7 +158,7 @@ async def safe_ban_user(
             await context.bot.send_message(
                 chat_id=OWNER_ID,
                 text=f"❌ <b>Ошибка бана</b>\n\n{error_msg}\n\n<b>"
-                     f"Действие:</b> Проверьте права бота в суперчате",
+                f"Действие:</b> Проверьте права бота в суперчате",
                 parse_mode="HTML",
             )
         except TelegramError:

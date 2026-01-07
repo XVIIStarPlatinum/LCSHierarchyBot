@@ -4,8 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from config import CHAT_ID, OWNER_ID, TOPIC_IMPORTANT_ID
-from utils.rank_system import (RankSystem, get_rank_by_points,
-                               get_user_restrictions)
+from utils.rank_system import RankSystem, get_rank_by_points, get_user_restrictions
 
 
 @pytest.fixture
