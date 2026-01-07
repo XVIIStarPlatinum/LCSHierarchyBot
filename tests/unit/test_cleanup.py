@@ -4,9 +4,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from config import CHAT_ID, OWNER_ID, TOPIC_IMPORTANT_ID, VERIFICATION_CONFIG
-from handlers.cleanup import (CleanupSystem, register_cleanup_task,
-                              run_scheduled_cleanup, safe_ban_user,
-                              send_cleanup_report)
+from handlers.cleanup import (
+    CleanupSystem,
+    register_cleanup_task,
+    run_scheduled_cleanup,
+    safe_ban_user,
+    send_cleanup_report,
+)
 
 
 @pytest.fixture

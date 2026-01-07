@@ -3,12 +3,24 @@ import re
 from datetime import datetime
 
 from telegram import Update
-from telegram.ext import (Application, CommandHandler, ContextTypes,
-                          MessageHandler, filters)
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 from telegram.ext._utils.types import BD
 
-from config import (CHAT_ID, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID,
-                    TOPIC_ID, TOPIC_IMPORTANT_ID)
+from config import (
+    CHAT_ID,
+    LOG_ENCODING,
+    LOG_FORMAT,
+    LOG_LEVEL,
+    OWNER_ID,
+    TOPIC_ID,
+    TOPIC_IMPORTANT_ID,
+)
 
 logging.basicConfig(
     format=LOG_FORMAT,

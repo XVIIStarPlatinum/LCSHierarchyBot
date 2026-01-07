@@ -2,16 +2,37 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from telegram import (ChatMember, Message, MessageReactionUpdated,
-                      ReactionType, ReactionTypeCustomEmoji, ReactionTypeEmoji,
-                      Update, User)
+from telegram import (
+    ChatMember,
+    Message,
+    MessageReactionUpdated,
+    ReactionType,
+    ReactionTypeCustomEmoji,
+    ReactionTypeEmoji,
+    Update,
+    User,
+)
 from telegram.error import TelegramError
-from telegram.ext import (Application, ChatMemberHandler, ContextTypes,
-                          MessageHandler, MessageReactionHandler, filters)
+from telegram.ext import (
+    Application,
+    ChatMemberHandler,
+    ContextTypes,
+    MessageHandler,
+    MessageReactionHandler,
+    filters,
+)
 from telegram.ext._utils.types import BD
 
-from config import (BOT_USERNAME, CHAT_ID, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL,
-                    OWNER_ID, POINTS_CONFIG, TOPIC_ID)
+from config import (
+    BOT_USERNAME,
+    CHAT_ID,
+    LOG_ENCODING,
+    LOG_FORMAT,
+    LOG_LEVEL,
+    OWNER_ID,
+    POINTS_CONFIG,
+    TOPIC_ID,
+)
 from database import Database
 
 logging.basicConfig(

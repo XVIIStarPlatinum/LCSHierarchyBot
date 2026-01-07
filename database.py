@@ -2,8 +2,14 @@ import logging
 import sqlite3
 from datetime import datetime, timedelta
 
-from config import (DATABASE_PATH, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL,
-                    OWNER_ID, OWNER_USERNAME)
+from config import (
+    DATABASE_PATH,
+    LOG_ENCODING,
+    LOG_FORMAT,
+    LOG_LEVEL,
+    OWNER_ID,
+    OWNER_USERNAME,
+)
 
 COUNTER_MESSAGES = "messages"
 COUNTER_MUSIC = "music"

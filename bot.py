@@ -7,8 +7,7 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, ContextTypes
 
-from config import (LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID,
-                    TELEGRAM_TOKEN)
+from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID, TELEGRAM_TOKEN
 from database import Database
 from handlers import activity, admin, antispam, cleanup, private_chat, profile
 from utils.points_system import PointsSystem

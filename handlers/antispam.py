@@ -6,8 +6,15 @@ from telegram import Message, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 from telegram.ext._utils.types import BD
 
-from config import (ANTI_SPAM_CONFIG, CHAT_ID, LOG_ENCODING, LOG_FORMAT,
-                    LOG_LEVEL, OWNER_ID, TOPIC_ID)
+from config import (
+    ANTI_SPAM_CONFIG,
+    CHAT_ID,
+    LOG_ENCODING,
+    LOG_FORMAT,
+    LOG_LEVEL,
+    OWNER_ID,
+    TOPIC_ID,
+)
 from utils.helpers import get_rank_level, normalize_text
 
 logging.basicConfig(
