@@ -4,7 +4,8 @@ from typing import Any, Union
 
 from telegram.ext import Application, ContextTypes
 
-from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, POINTS_CONFIG, SCHEDULED_TASKS
+from config import (LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, POINTS_CONFIG,
+                    SCHEDULED_TASKS)
 from database import Database
 from utils.helpers import notify_owner_error
 

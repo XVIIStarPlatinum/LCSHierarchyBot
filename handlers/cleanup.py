@@ -6,7 +6,8 @@ from telegram.error import TelegramError
 from telegram.ext import Application, ContextTypes
 from telegram.ext._utils.types import BD
 
-from config import BOT_USERNAME, CHAT_ID, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID
+from config import (BOT_USERNAME, CHAT_ID, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL,
+                    OWNER_ID)
 from utils.helpers import get_clean_rank, notify_owner_error
 
 logging.basicConfig(

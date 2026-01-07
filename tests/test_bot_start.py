@@ -6,7 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID, TELEGRAM_TOKEN
+from config import (LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID,
+                    TELEGRAM_TOKEN)
 
 # Исправление кодировки для Windows
 if sys.platform.startswith("win"):
