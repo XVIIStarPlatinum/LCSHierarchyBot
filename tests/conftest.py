@@ -9,7 +9,7 @@ from database import Database
 
 
 def ensure_directories():
-    directories = ['logs', 'database']
+    directories = ["logs", "database"]
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
 
