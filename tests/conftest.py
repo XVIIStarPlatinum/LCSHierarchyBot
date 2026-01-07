@@ -13,6 +13,7 @@ def ensure_directories():
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
 
+
 ensure_directories()
 
 
