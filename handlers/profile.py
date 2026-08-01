@@ -86,7 +86,7 @@ async def handle_start_command(
                 )
 
         is_owner = user.id == OWNER_ID
-        is_admin = await db.is_admin(user.id)
+        is_admin = db.is_admin(user.id)
 
         if is_owner:
             welcome_prefix = (
@@ -276,7 +276,7 @@ async def handle_profile_command(
     rank_system = bot_instance.rank_system
 
     # Проверка прав для определения времени кэширования
-    is_admin = await db.is_admin(user.id)
+    is_admin = db.is_admin(user.id)
     is_owner = user.id == OWNER_ID
     use_cache = not (is_admin or is_owner)
 
@@ -344,14 +344,14 @@ async def handle_top_command(
     user = update.effective_user
     message = update.effective_message
 
-    # Проверка что команда в ЛС
+    # Проверка, что команда в ЛС
     if message.chat.type != "private":
         return
 
     bot_instance = context.bot_data["bot_instance"]
     db = bot_instance.db
 
-    is_admin = await db.is_admin(user.id)
+    is_admin = db.is_admin(user.id)
     is_owner = user.id == OWNER_ID
     use_cache = not (is_admin or is_owner)
 

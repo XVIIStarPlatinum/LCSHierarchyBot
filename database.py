@@ -153,6 +153,24 @@ class Database:
         """
         )
 
+        # Локальный журнал авторов сообщений в суперчате. Bot API не даёт
+        # ботам возможности запросить произвольное сообщение по ID
+        # постфактум, поэтому для начисления баллов за ПОЛУЧЕННЫЕ реакции
+        # автор и топик сообщения сохраняются здесь в момент отправки.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS message_log (
+                message_id INTEGER,
+                chat_id INTEGER,
+                message_thread_id INTEGER,
+                user_id INTEGER,
+                username TEXT,
+                timestamp TIMESTAMP DEFAULT (datetime('now')),
+                PRIMARY KEY (message_id, chat_id)
+            )
+        """
+        )
+
         self.conn.commit()
         logger.info("All tables created successfully")
 
@@ -218,6 +236,14 @@ class Database:
         # Таблица admins (поиск администраторов)
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_admins_user_id ON admins(user_id)"
+        )
+
+        # Таблица message_log (поиск автора сообщения по реакции)
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_message_log_timestamp ON message_log(timestamp)
+        """
         )
 
         self.conn.commit()
@@ -993,6 +1019,62 @@ class Database:
         self.conn.commit()
         logger.info(f"Legend rank unset for user_id={user_id} by admin_id={admin_id}")
         return True
+
+    def record_message(
+        self,
+        message_id: int,
+        chat_id: int,
+        message_thread_id: int,
+        user_id: int,
+        username: str = None,
+    ) -> bool:
+        """
+        Этот метод сохраняет автора и топик сообщения в момент отправки.
+        Используется, так как Bot API не позволяет ботам запросить
+        произвольное сообщение по ID постфактум (нет метода getMessages),
+        а эта информация нужна для начисления баллов за полученные реакции.
+        Args:
+            message_id (int): ID сообщения.
+            chat_id (int): ID чата.
+            message_thread_id (int): ID топика (может быть `None`).
+            user_id (int): ID автора сообщения.
+            username (str, optional): Имя пользователя.
+        Returns:
+            bool: `True` если успешно, `False` если ошибка.
+        """
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO message_log (
+                    message_id, chat_id, message_thread_id, user_id, username
+                ) VALUES (?, ?, ?, ?, ?)
+            """,
+                (message_id, chat_id, message_thread_id, user_id, username),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error recording message_id={message_id}: {e}")
+            return False
+
+    def get_message_author(self, message_id: int, chat_id: int) -> object:
+        """
+        Этот метод получает сохранённого автора и топик сообщения
+        по его ID (см. record_message).
+        Args:
+            message_id (int): ID сообщения.
+            chat_id (int): ID чата.
+        Returns:
+            object: Запись из message_log, либо `None`, если не найдена
+            (например, сообщение было отправлено до запуска бота).
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT * FROM message_log WHERE message_id = ? AND chat_id = ?",
+            (message_id, chat_id),
+        )
+        return cursor.fetchone()
 
     def close(self) -> None:
         """Этот метод закрывает соединения с базой данных."""

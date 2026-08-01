@@ -4,7 +4,6 @@ from typing import Optional
 
 from telegram import (
     ChatMember,
-    Message,
     MessageReactionUpdated,
     ReactionType,
     ReactionTypeCustomEmoji,
@@ -12,7 +11,6 @@ from telegram import (
     Update,
     User,
 )
-from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     ChatMemberHandler,
@@ -107,6 +105,38 @@ async def handle_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         logger.error(
             f"Failed to send welcome message to new member {new_member.user.id}: {e}"
         )
+
+
+async def handle_track_message(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """
+    Эта функция сохраняет автора и топик каждого сообщения в суперчате.
+    Это необходимо для начисления баллов за ПОЛУЧЕННЫЕ реакции, так как
+    Bot API не позволяет ботам запросить произвольное сообщение по ID
+    постфактум — единственный способ узнать, кто автор сообщения,
+    на которое поставили реакцию, — запомнить это заранее.
+    Args:
+        update (Update): Событие обновления состояния.
+        context (ContextTypes): Контекст приложения.
+    """
+    message = update.effective_message
+    user = update.effective_user
+
+    if not message or not user or message.chat.id != CHAT_ID:
+        return
+
+    bot_instance = context.bot_data.get("bot_instance")
+    if not bot_instance:
+        return
+
+    bot_instance.db.record_message(
+        message_id=message.message_id,
+        chat_id=message.chat.id,
+        message_thread_id=message.message_thread_id,
+        user_id=user.id,
+        username=user.username or user.first_name,
+    )
 
 
 async def handle_text_message(
@@ -272,21 +302,29 @@ async def handle_reaction_update(
             )
             return
 
-        try:
-            messages = await context.bot.get_messages(
-                chat_id=reaction_update.chat.id,
-                message_ids=[reaction_update.message_id],
+        bot_instance = context.bot_data.get("bot_instance")
+        if not bot_instance:
+            logger.error("Bot instance not found in context.bot_data")
+            return
+
+        db = bot_instance.db
+
+        # Bot API не позволяет запросить произвольное сообщение по ID,
+        # поэтому автор и топик берутся из локального журнала
+        # (см. handle_track_message), заполняемого в момент отправки.
+        message_record = db.get_message_author(
+            reaction_update.message_id, reaction_update.chat.id
+        )
+
+        if not message_record:
+            logger.debug(
+                "No local record for message_id="
+                f"{reaction_update.message_id}; skipping "
+                "(sent before tracking started)."
             )
-            message = messages[0] if messages else None
-        except TelegramError as e:
-            logger.warning(f"Could not fetch message {reaction_update.message_id}: {e}")
             return
 
-        if not message:
-            logger.debug(f"No message found with ID {reaction_update.message_id}")
-            return
-
-        message_thread_id = getattr(message, "message_thread_id", None)
+        message_thread_id = message_record["message_thread_id"]
         if message_thread_id is not None and message_thread_id != TOPIC_ID:
             logger.debug(
                 f"Reaction in wrong topic: {message_thread_id}, expected: {TOPIC_ID}"
@@ -298,13 +336,9 @@ async def handle_reaction_update(
             logger.debug("Skipping owner or missing user in reaction update")
             return
 
-        bot_instance = context.bot_data.get("bot_instance")
-        if not bot_instance:
-            logger.error("Bot instance not found in context.bot_data")
-            return
-
-        db = bot_instance.db
-        await _process_reaction_changes(reaction_update, message, user, db, context)
+        await _process_reaction_changes(
+            reaction_update, message_record, user, db, context
+        )
 
         logger.debug(
             f"✅ Reaction processed: chat_id={reaction_update.chat.id}, "
@@ -329,7 +363,7 @@ async def handle_reaction_update(
 
 async def _process_reaction_changes(
     reaction_update: MessageReactionUpdated,
-    message: Message,
+    message_record: object,
     user: User,
     db: Database,
     context: ContextTypes.DEFAULT_TYPE,
@@ -339,7 +373,8 @@ async def _process_reaction_changes(
     реакций с корректной фильтрацией по топикам.
     Args:
         reaction_update (MessageReactionUpdated): Изменение реакции.
-        message (Message): Сообщение, на которую ставили реакцию.
+        message_record (object): Локальная запись сообщения (автор,
+        топик), на которое поставили реакцию (см. handle_track_message).
         user (User): Пользователь.
         db (Database): Класс работы с базой данных.
         context (ContextTypes): Контекст приложения.
@@ -362,7 +397,7 @@ async def _process_reaction_changes(
     # 3. Обработка полученных реакций (для автора сообщения)
     if added_reactions:
         await _process_received_reaction(
-            db, context, reaction_update.message_id, message
+            db, context, reaction_update.message_id, message_record
         )
 
 
@@ -470,7 +505,10 @@ async def _process_removed_reaction(
 
 
 async def _process_received_reaction(
-    db: Database, context: ContextTypes.DEFAULT_TYPE, message_id: int, message: Message
+    db: Database,
+    context: ContextTypes.DEFAULT_TYPE,
+    message_id: int,
+    message_record: object,
 ) -> None:
     """
     Эта функция осуществляет обработку полученной реакции (для автора сообщения).
@@ -478,34 +516,33 @@ async def _process_received_reaction(
         db (Database): Класс работы с базой данных.
         context (ContextTypes): Контекст приложения.
         message_id (int): ID сообщения.
-        message (Message): Сообщение, которое получало реакций.
+        message_record (object): Локальная запись автора сообщения,
+        которое получило реакцию (см. handle_track_message).
     """
     try:
-        if not message or not hasattr(message, "from_user") or not message.from_user:
+        if not message_record:
             logger.debug(f"No author found for message_id={message_id}")
             return
 
-        target_user = message.from_user
+        target_user_id = message_record["user_id"]
+        target_username = message_record["username"]
 
         # Исключение владельца
-        if target_user.id == OWNER_ID:
+        if target_user_id == OWNER_ID:
             logger.debug(f"Skipping received reaction for owner: user_id={OWNER_ID}")
             return
 
         # Начисление баллов
-        target_user_data = db.get_user(target_user.id)
+        target_user_data = db.get_user(target_user_id)
         if not target_user_data:
-            db.create_user(
-                target_user.id, target_user.username or target_user.first_name
-            )
+            db.create_user(target_user_id, target_username)
 
         points_to_add = POINTS_CONFIG["reaction_received"]["points_per_reaction"]
-        db.update_user_points(target_user.id, points_to_add)
+        db.update_user_points(target_user_id, points_to_add)
 
-        username = target_user.username or target_user.first_name
         logger.info(
             "⭐ Reaction received: "
-            f"target_user_id={target_user.id}, username={username}, "
+            f"target_user_id={target_user_id}, username={target_username}, "
             f"points=+{points_to_add}, message_id={message_id}"
         )
 
@@ -596,6 +633,13 @@ def register_handlers(application: Application, bot_instance: BD) -> None:
         bot_instance (BD): Экземпляр бота.
     """
     application.bot_data["bot_instance"] = bot_instance
+
+    # Отдельная группа, чтобы журнал сообщений заполнялся независимо
+    # от остальной обработки (нужен для баллов за полученные реакции).
+    application.add_handler(
+        MessageHandler(filters.Chat(CHAT_ID) & filters.ALL, handle_track_message),
+        group=-1,
+    )
 
     application.add_handler(
         ChatMemberHandler(handle_new_member, ChatMemberHandler.CHAT_MEMBER), group=0

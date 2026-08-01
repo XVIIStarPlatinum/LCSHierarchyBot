@@ -53,7 +53,7 @@ async def handle_add_command(
     rank_system = bot_instance.rank_system
 
     # Проверка прав
-    if user.id != OWNER_ID and not await db.is_admin(user.id):
+    if user.id != OWNER_ID and not db.is_admin(user.id):
         await message.reply_text("❌ У вас нет прав для использования этой команды.")
         return
 
@@ -370,7 +370,7 @@ async def handle_setadmin_command(
         return
 
     # Проверка, не является ли пользователь уже админом
-    if await db.is_admin(target_user["user_id"]):
+    if db.is_admin(target_user["user_id"]):
         await message.reply_text(
             f"❌ Пользователь @{username} уже является администратором."
         )
@@ -463,7 +463,7 @@ async def handle_unsetadmin_command(
         return
 
     # Проверка, является ли пользователь админом
-    if not await db.is_admin(target_user["user_id"]):
+    if not db.is_admin(target_user["user_id"]):
         await message.reply_text(
             f"❌ Пользователь @{username} не является администратором."
         )
@@ -536,7 +536,7 @@ async def handle_admins_command(
     db = bot_instance.db
 
     # Проверка прав (админы и владелец)
-    if user.id != OWNER_ID and not await db.is_admin(user.id):
+    if user.id != OWNER_ID and not db.is_admin(user.id):
         await message.reply_text(
             "❌ У вас нет прав для просмотра списка администраторов."
         )
@@ -604,7 +604,7 @@ async def handle_reset_command(
     db = bot_instance.db
 
     # Проверка прав (админы и владелец)
-    if user.id != OWNER_ID and not await db.is_admin(user.id):
+    if user.id != OWNER_ID and not db.is_admin(user.id):
         await message.reply_text("❌ У вас нет прав для использования этой команды.")
         return
 
@@ -675,7 +675,7 @@ async def handle_user_profile_command(
     db = bot_instance.db
 
     # Проверка прав (админы и владелец)
-    if user.id != OWNER_ID and not await db.is_admin(user.id):
+    if user.id != OWNER_ID and not db.is_admin(user.id):
         await message.reply_text("❌ У вас нет прав для просмотра чужих профилей.")
         return
 
