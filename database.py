@@ -742,6 +742,35 @@ class Database:
         logger.info(f"Bot message deleted: {message_id}, user_id={user_id}")
         return True
 
+    def get_user_by_username(self, username: str) -> object:
+        """
+        Этот метод находит пользователя по username (регистронезависимо).
+        В отличие от get_top_users(), не исключает владельца — этот
+        метод предназначен для админских команд поиска (/add, /legend,
+        /reset, /@username и т.д.), а не для отображения рейтинга, где
+        исключение владельца оправдано, но здесь оно означало, что
+        @ViceMGMT нельзя было найти ни одной из этих команд.
+        Args:
+            username (str): Имя пользователя (с @ или без).
+        Returns:
+            object: Пользователь, либо `None`, если не найден.
+        """
+        if not username:
+            return None
+
+        clean_username = username.lstrip("@")
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM users
+            WHERE username = ? COLLATE NOCASE
+              AND rank != 'УДАЛЕН'
+        """,
+            (clean_username,),
+        )
+        return cursor.fetchone()
+
     def get_top_users(self, limit: int = 100) -> list:
         """
         Этот метод получает всех топ пользователей по баллам.

@@ -74,13 +74,7 @@ async def handle_add_command(
     username = username_arg.lstrip("@")
 
     # Поиск пользователя в базе данных
-    target_user = None
-    all_users = db.get_top_users(1000)  # Получаем всех пользователей
-
-    for u in all_users:
-        if u["username"] and u["username"].lower() == username.lower():
-            target_user = u
-            break
+    target_user = db.get_user_by_username(username)
 
     if not target_user:
         await message.reply_text(
@@ -207,13 +201,7 @@ async def handle_legend_command(
     username = username_arg.lstrip("@")
 
     # Поиск пользователя
-    target_user = None
-    all_users = db.get_top_users(1000)
-
-    for u in all_users:
-        if u["username"] and u["username"].lower() == username.lower():
-            target_user = u
-            break
+    target_user = db.get_user_by_username(username)
 
     if not target_user:
         await message.reply_text(f"❌ Пользователь @{username} не найден.")
@@ -279,13 +267,7 @@ async def handle_unlegend_command(
     username = username_arg.lstrip("@")
 
     # Поиск пользователя
-    target_user = None
-    all_users = db.get_top_users(1000)
-
-    for u in all_users:
-        if u["username"] and u["username"].lower() == username.lower():
-            target_user = u
-            break
+    target_user = db.get_user_by_username(username)
 
     if not target_user:
         await message.reply_text(f"❌ Пользователь @{username} не найден.")
@@ -360,14 +342,7 @@ async def handle_setadmin_command(
     target_user = None
     all_users = db.get_top_users(1000)
 
-    for u in all_users:
-        if u["username"] and u["username"].lower() == username.lower():
-            target_user = u
-            break
-
-    if not target_user:
-        await message.reply_text(f"❌ Пользователь @{username} не найден.")
-        return
+    target_user = db.get_user_by_username(username)
 
     # Проверка, не является ли пользователь уже админом
     if db.is_admin(target_user["user_id"]):
@@ -453,14 +428,7 @@ async def handle_unsetadmin_command(
     target_user = None
     all_users = db.get_top_users(1000)
 
-    for u in all_users:
-        if u["username"] and u["username"].lower() == username.lower():
-            target_user = u
-            break
-
-    if not target_user:
-        await message.reply_text(f"❌ Пользователь @{username} не найден.")
-        return
+    target_user = db.get_user_by_username(username)
 
     # Проверка, является ли пользователь админом
     if not db.is_admin(target_user["user_id"]):
@@ -621,14 +589,7 @@ async def handle_reset_command(
     target_user = None
     all_users = db.get_top_users(1000)
 
-    for u in all_users:
-        if u["username"] and u["username"].lower() == username.lower():
-            target_user = u
-            break
-
-    if not target_user:
-        await message.reply_text(f"❌ Пользователь @{username} не найден.")
-        return
+    target_user = db.get_user_by_username(username)
 
     # Сброс таймера неактивности
     try:
@@ -696,14 +657,7 @@ async def handle_user_profile_command(
     target_user = None
     all_users = db.get_top_users(1000)
 
-    for u in all_users:
-        if u["username"] and u["username"].lower() == username.lower():
-            target_user = u
-            break
-
-    if not target_user:
-        await message.reply_text(f"❌ Пользователь @{username} не найден.")
-        return
+    target_user = db.get_user_by_username(username)
 
     # Формирование профиля
     try:
