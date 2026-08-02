@@ -85,6 +85,18 @@ async def handle_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if bot_messages:
             logger.debug(f"Existing verified user joined: {new_member.user.id}")
             return
+    else:
+        # Регистрируем участника сразу при вступлении. Без этого запись
+        # в `users` появлялась только при первом отслеживаемом действии
+        # (сообщение/аудио/реакция или /start), и участник, который
+        # просто ничего не делал, никогда не попадал в проверки
+        # неверификации/неактивности --, то есть 24-часовой бан по факту
+        # никогда не срабатывал для тех, кто тихо ничего не писал.
+        db.create_user(new_member.user.id, new_member.user.username)
+        logger.info(
+            "New member registered on join for verification tracking: "
+            f"user_id={new_member.user.id}"
+        )
 
     try:
         username = (

@@ -273,8 +273,8 @@ class Database:
         cursor.execute(
             """
             INSERT OR IGNORE INTO USERS (
-                user_id, username, rank, last_reset
-            ) VALUES (?, ?, 'Новичок', ?)
+                user_id, username, rank, last_activity, last_reset
+            ) VALUES (?, ?, 'Новичок', CURRENT_TIMESTAMP, ?)
         """,
             (user_id, username, today),
         )
