@@ -48,12 +48,15 @@ def normalize_text(text: str) -> str:
 
 def get_clean_rank(rank_with_emoji: str) -> str:
     """
-    Эта вспомогательная функция очищает ранга от
-    эмодзи и префиксов для работы с базой данных.
+    Эта вспомогательная функция очищает ранг от эмодзи и лишних пробелов
+    (например, "🔰 Новичок" -> "Новичок"). Также корректно работает,
+    если на вход уже подан "чистый" ранг без эмодзи (как он хранится
+    в БД) — тогда он просто возвращается без изменений.
     Args:
-        rank_with_emoji (str): Название ранга из телеграмы с эмодзи.
+        rank_with_emoji (str): Название ранга, с эмодзи или без.
     Returns:
-        str: Название ранга без эмодзи.
+        str: Название ранга без эмодзи, либо "Новичок", если
+        распознать ранг не удалось.
     """
     if not rank_with_emoji:
         return "Новичок"
@@ -62,20 +65,9 @@ def get_clean_rank(rank_with_emoji: str) -> str:
         char
         for char in rank_with_emoji
         if char.isalpha() or char.isspace() or char == "-"
-    )
-    clean_rank = clean_rank.strip()
+    ).strip()
 
-    rank_mapping = {
-        "🔰 Новичок": "Новичок",
-        "🎗 Стажёр": "Стажёр",
-        "🥉 Участник": "Участник",
-        "🥈 Активист": "Активист",
-        "🥇 Завсегдатай": "Завсегдатай",
-        "🏆 Представитель": "Представитель",
-        "💎 Легенда": "Легенда",
-    }
-
-    return rank_mapping.get(clean_rank, "Новичок")
+    return clean_rank if clean_rank in RANK_HIERARCHY else "Новичок"
 
 
 def format_rank_with_emoji(rank: str) -> str:

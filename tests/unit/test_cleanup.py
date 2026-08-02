@@ -298,7 +298,13 @@ class TestCleanupSystem:
         assert "За неверификацию: 1" in report_text
         assert "<b>Всего удалено:</b> 3" in report_text
         assert "<b>Пропущено:</b> 1" in report_text
-        assert "🔰 Новичок: 3" in report_text
+        # До фикса get_clean_rank() всегда возвращала "Новичок" для
+        # любого входа, поэтому все 3 пользователя (с разными рангами)
+        # ошибочно попадали в один бакет. Корректное поведение —
+        # по одному пользователю в каждом соответствующем ранге.
+        assert "🔰 Новичок: 1" in report_text
+        assert "🎗 Стажёр: 1" in report_text
+        assert "🥉 Участник: 1" in report_text
 
     async def test_scheduled_cleanup_execution(self, mock_bot_instance):
         """
