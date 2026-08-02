@@ -51,7 +51,7 @@ RANKS = [
         "max_points": 9.9,
         "emoji": "🔰",
         "inactivity_period": 24,
-        "points_decay": 0.2,
+        "points_decay": 1,  # -1 балл за каждые 24ч без сообщений И реакций
     },
     {
         "name": "Стажёр",
@@ -59,7 +59,7 @@ RANKS = [
         "max_points": 99.9,
         "emoji": "🎗",
         "inactivity_period": 72,
-        "points_decay": 0.1,
+        "points_decay": 0.0,  # без уменьшения
     },
     {
         "name": "Участник",
@@ -67,7 +67,7 @@ RANKS = [
         "max_points": 199.9,
         "emoji": "🥉",
         "inactivity_period": 168,
-        "points_decay": 0.0,  # без уменьшения (дальше то же самое)
+        "points_decay": 0.0,  # дальше то же самое
     },
     {
         "name": "Активист",
@@ -128,7 +128,7 @@ ANTI_SPAM_CONFIG = {
 # Периодические задачи
 SCHEDULED_TASKS = {
     "daily_reset": 24 * 3600,  # Сброс дневных лимитов
-    "points_decay": 3600,  # Срок между уменьшениями баллов у новичков и стажёров
+    "points_decay": 24 * 3600,  # Срок между уменьшениями баллов у новичков (24ч)
     "inactivity_check": 10 * 60,  # Срок между проверками неактивности (10 минут)
     "cache_cleanup": 600,  # Срок между очистками кэша
 }

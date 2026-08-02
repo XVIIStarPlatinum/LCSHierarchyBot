@@ -326,6 +326,8 @@ class TestPointsSystem:
     async def test_decay_timing(self, points_system):
         """
         Тест точного времени уменьшения баллов.
+        Затухание теперь суточное и привязано к той же полуночи,
+        что и сброс дневных лимитов (было привязано к началу часа).
         """
         # Симулируем текущее время
         now = datetime(2024, 1, 1, 14, 30)  # 14:30
@@ -344,5 +346,5 @@ class TestPointsSystem:
             decay_call = mock_application.job_queue.run_repeating.call_args_list[1]
             first_decay = decay_call[1]["first"]
 
-            # До начала следующего часа осталось 30 минут = 1800 секунд
-            assert abs(first_decay - 1800) < 1  # Учитываем погрешность
+            # До полночи осталось 9.5 часов = 34200 секунд
+            assert abs(first_decay - 34200) < 1  # Учитываем погрешность

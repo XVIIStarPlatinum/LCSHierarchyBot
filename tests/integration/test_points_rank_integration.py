@@ -168,30 +168,30 @@ class TestPointsRankIntegration:
 
     async def test_inactive_points_decay(self, integrated_systems):
         """
-        Тест уменьшения баллов для неактивных пользователей.
+        Тест уменьшения баллов для неактивных Новичков (новая логика).
         """
         db = integrated_systems["db"]
         points_system = integrated_systems["points_system"]
 
-        # Создаем неактивных пользователей
-        # Новичок с 5 баллами
+        # Новичок с 5 баллами, без своей активности 25 часов
         newbie_id = 1004
         db.create_user(newbie_id, "inactive_newbie")
         db.update_user_points(newbie_id, 5.0)
         cursor = db.conn.cursor()
-        old_time = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+        old_time = (datetime.now() - timedelta(hours=25)).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute(
-            "UPDATE users SET last_activity = ? WHERE user_id = ?",
+            "UPDATE users SET last_self_activity = ? WHERE user_id = ?",
             (old_time, newbie_id),
         )
         db.conn.commit()
 
-        # Стажёр с 15 баллами
+        # Стажёр с 15 баллами — больше не должен терять баллы (решение клиента)
         trainee_id = 1005
         db.create_user(trainee_id, "inactive_trainee")
         db.update_user_points(trainee_id, 15.0)
         cursor.execute(
-            "UPDATE users SET last_activity = ? WHERE user_id = ?",
+            "UPDATE users SET rank = 'Стажёр', last_self_activity = ? "
+            "WHERE user_id = ?",
             (old_time, trainee_id),
         )
         db.conn.commit()
@@ -201,10 +201,10 @@ class TestPointsRankIntegration:
 
         # Проверяем результаты
         newbie = db.get_user(newbie_id)
-        assert newbie["points"] == approx(4.8)  # 5.0 - 0.2
+        assert newbie["points"] == approx(4.0)  # 5.0 - 1
 
         trainee = db.get_user(trainee_id)
-        assert trainee["points"] == approx(14.9)  # 15.0 - 0.1
+        assert trainee["points"] == approx(15.0)  # Стажёр больше не затухает
 
     def test_privileges_and_restrictions_by_rank(self, integrated_systems):
         """

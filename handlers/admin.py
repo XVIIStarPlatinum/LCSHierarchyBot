@@ -341,6 +341,10 @@ async def handle_setadmin_command(
     # Поиск пользователя
     target_user = db.get_user_by_username(username)
 
+    if not target_user:
+        await message.reply_text(f"❌ Пользователь @{username} не найден.")
+        return
+
     # Проверка, не является ли пользователь уже админом
     if db.is_admin(target_user["user_id"]):
         await message.reply_text(
@@ -423,6 +427,10 @@ async def handle_unsetadmin_command(
 
     # Поиск пользователя
     target_user = db.get_user_by_username(username)
+
+    if not target_user:
+        await message.reply_text(f"❌ Пользователь @{username} не найден.")
+        return
 
     # Проверка, является ли пользователь админом
     if not db.is_admin(target_user["user_id"]):
@@ -582,6 +590,10 @@ async def handle_reset_command(
     # Поиск пользователя
     target_user = db.get_user_by_username(username)
 
+    if not target_user:
+        await message.reply_text(f"❌ Пользователь @{username} не найден.")
+        return
+
     # Сброс таймера неактивности
     try:
         # Обновление времени последней активности
@@ -646,6 +658,10 @@ async def handle_user_profile_command(
 
     # Поиск пользователя
     target_user = db.get_user_by_username(username)
+
+    if not target_user:
+        await message.reply_text(f"❌ Пользователь @{username} не найден.")
+        return
 
     # Формирование профиля
     try:

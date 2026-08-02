@@ -408,40 +408,42 @@ class TestDatabase:
 
     def test_decrease_points_for_inactive(self, db):
         """
-        Тест уменьшения баллов для неактивных пользователей.
+        Тест уменьшения баллов для неактивных Новичков (новая логика:
+        только Новичок, триггер — last_self_activity старше 24ч,
+        плоское -1 за вызов).
         """
         now = datetime.now()
-        inactive_time = now - timedelta(hours=2)
+        inactive_time = now - timedelta(hours=25)
 
         # Создаем пользователей с разными рангами
         test_users = [
-            {  # Новичок - должен потерять 0.2 балла
+            {  # Новичок - должен потерять 1 балл
                 "user_id": 301,
                 "username": "newbie",
                 "rank": "Новичок",
                 "points": 10.0,
-                "last_activity": inactive_time,
+                "last_self_activity": inactive_time,
             },
-            {  # Стажёр - должен потерять 0.1 балла
+            {  # Стажёр - больше не теряет баллы (решение клиента)
                 "user_id": 302,
                 "username": "trainee",
                 "rank": "Стажёр",
                 "points": 20.0,
-                "last_activity": inactive_time,
+                "last_self_activity": inactive_time,
             },
             {  # Участник - не должен потерять баллы
                 "user_id": 303,
                 "username": "member",
                 "rank": "Участник",
                 "points": 100.0,
-                "last_activity": inactive_time,
+                "last_self_activity": inactive_time,
             },
             {  # Владелец - не должен потерять баллы
                 "user_id": OWNER_ID,
                 "username": OWNER_USERNAME,
                 "rank": "Легенда",
                 "points": 9999.0,
-                "last_activity": inactive_time,
+                "last_self_activity": inactive_time,
             },
         ]
 
@@ -457,13 +459,13 @@ class TestDatabase:
                            UPDATE users
                            SET rank = ?,
                                points = ?,
-                               last_activity = ?
+                               last_self_activity = ?
                            WHERE user_id = ?
                            """,
                 (
                     user_data["rank"],
                     user_data["points"],
-                    user_data["last_activity"].strftime("%Y-%m-%d %H:%M:%S"),
+                    user_data["last_self_activity"].strftime("%Y-%m-%d %H:%M:%S"),
                     user_data["user_id"],
                 ),
             )
@@ -472,75 +474,41 @@ class TestDatabase:
         # Уменьшаем баллы для неактивных
         affected_count = db.decrease_points_for_inactive()
         # Проверяем результат
-        assert affected_count == 2  # Только Новичок и Стажёр
+        assert affected_count == 1  # Только Новичок
 
         # Проверяем баллы Новичка
         newbie = db.get_user(301)
-        assert abs(newbie["points"] - 9.8) < 0.01  # 10.0 - 0.2
+        assert abs(newbie["points"] - 9.0) < 0.01  # 10.0 - 1
 
-        # Проверяем баллы Стажёра
+        # Проверяем баллы Стажёра (больше не уменьшаются)
         trainee = db.get_user(302)
-        assert abs(trainee["points"] - 19.9) < 0.01  # 20.0 - 0.1
+        assert trainee["points"] == 20.0
 
         # Проверяем баллы Участника (не должны измениться)
         member = db.get_user(303)
         assert member["points"] == 100.0
 
-        # Второй забег
+        # Владелец не должен потерять баллы
+        owner = db.get_user(OWNER_ID)
+        assert owner["points"] == 9999.0
+
+        # Второй забег (ещё одни "сутки" без активности) — компаундится
         affected_count_2 = db.decrease_points_for_inactive()
-        assert affected_count_2 == 2
+        assert affected_count_2 == 1
 
         newbie = db.get_user(301)
-        assert abs(newbie["points"] - 9.6) < 0.01
+        assert abs(newbie["points"] - 8.0) < 0.01
 
-        trainee = db.get_user(302)
-        assert abs(trainee["points"] - 19.8) < 0.01
-
-        # Ещё один раз
-        for i in range(3):
-            db.decrease_points_for_inactive()
-
-        newbie = db.get_user(301)
-        assert abs(newbie["points"] - 9.0) < 0.01
-
-        trainee = db.get_user(302)
-        assert abs(trainee["points"] - 19.5) < 0.01
-
-        # Тест с более длительной инактивностью
-        long_inactive_user_id = 304
-        db.create_user(long_inactive_user_id, "long_inactive")
+        # Могут ли баллы уменьшиться ниже 0? Нет конечно
+        low_points_user_id = 305
+        db.create_user(low_points_user_id, "low_points")
         cursor = db.conn.cursor()
         cursor.execute(
             """
             UPDATE users
             SET rank = 'Новичок',
-                points = 10.0,
-                last_activity = ?
-            WHERE user_id = ?
-        """,
-            (
-                (now - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S"),
-                long_inactive_user_id,
-            ),
-        )
-        db.conn.commit()
-
-        # 4-ый раз, просто потому что
-        # Если прошло 5 часов, уменьшится на 1 или на 0,2?
-        for i in range(5):
-            db.decrease_points_for_inactive()
-        long_inactive = db.get_user(long_inactive_user_id)
-        assert abs(long_inactive["points"] - 9.0) < 0.01
-
-        # Могут ли баллы уменьшиться ниже 0? Нет конечно
-        low_points_user_id = 305
-        db.create_user(low_points_user_id, "low_points")
-        cursor.execute(
-            """
-            UPDATE users
-            SET rank = 'Новичок',
-                points = 0.1,
-                last_activity = ?
+                points = 0.5,
+                last_self_activity = ?
             WHERE user_id = ?
         """,
             (inactive_time.strftime("%Y-%m-%d %H:%M:%S"), low_points_user_id),
@@ -549,7 +517,34 @@ class TestDatabase:
 
         db.decrease_points_for_inactive()
         low_points = db.get_user(low_points_user_id)
-        assert low_points["points"] == 0.0  # (0 > 0.1 - 0.2) -> 0
+        assert low_points["points"] == 0.0  # max(0, 0.5 - 1) -> 0
+
+        # Новичок, который недавно писал/реагировал сам (last_self_activity
+        # свежий), не должен терять баллы, даже если last_activity (который
+        # также обновляется при ПОЛУЧЕНИИ реакции) старый — это и есть
+        # ключевое отличие новой логики.
+        recently_self_active_id = 306
+        db.create_user(recently_self_active_id, "recently_active")
+        cursor.execute(
+            """
+            UPDATE users
+            SET rank = 'Новичок',
+                points = 5.0,
+                last_activity = ?,
+                last_self_activity = ?
+            WHERE user_id = ?
+        """,
+            (
+                inactive_time.strftime("%Y-%m-%d %H:%M:%S"),  # старый last_activity
+                now.strftime("%Y-%m-%d %H:%M:%S"),  # свежий last_self_activity
+                recently_self_active_id,
+            ),
+        )
+        db.conn.commit()
+
+        db.decrease_points_for_inactive()
+        recently_active = db.get_user(recently_self_active_id)
+        assert recently_active["points"] == 5.0  # не должно уменьшиться
 
     def test_transaction_rollback(self, db, sample_user):
         """

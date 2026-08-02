@@ -102,12 +102,36 @@ class Database:
             }
             self.VERIFY_THRESHOLD = timedelta(hours=24)  # 24 часа на верификацию
             self.create_tables()
+            self._migrate_schema()
             self.initialize_owner()
             self.create_indexes()
             logger.info(f"Database initialized successfully at {self.DATABASE_PATH}")
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
             raise
+
+    def _migrate_schema(self) -> None:
+        """
+        Этот метод добавляет колонки, появившиеся после первого
+        создания БД, в уже существующие базы данных (`CREATE TABLE
+        IF NOT EXISTS` не трогает таблицу, если она уже есть, поэтому
+        для действующих баз нужен отдельный шаг миграции).
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        existing_columns = {row["name"] for row in cursor.fetchall()}
+
+        if "last_self_activity" not in existing_columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_self_activity TIMESTAMP")
+            # Для уже существующих строк начинаем отсчёт затухания с
+            # текущего момента, а не с NULL (иначе сравнение "< 24 часа
+            # назад" в SQL молча никогда не сработает).
+            cursor.execute(
+                "UPDATE users SET last_self_activity = CURRENT_TIMESTAMP "
+                "WHERE last_self_activity IS NULL"
+            )
+            self.conn.commit()
+            logger.info("Migrated: added last_self_activity column to users")
 
     def create_tables(self) -> None:
         """
@@ -123,6 +147,7 @@ class Database:
                 points REAL DEFAULT 0.0,
                 rank TEXT DEFAULT 'Новичок',
                 last_activity TIMESTAMP,
+                last_self_activity TIMESTAMP,
                 messages_today INTEGER DEFAULT 0,
                 music_today INTEGER DEFAULT 0,
                 reactions_given_today INTEGER DEFAULT 0,
@@ -273,8 +298,9 @@ class Database:
         cursor.execute(
             """
             INSERT OR IGNORE INTO USERS (
-                user_id, username, rank, last_activity, last_reset
-            ) VALUES (?, ?, 'Новичок', CURRENT_TIMESTAMP, ?)
+                user_id, username, rank, last_activity,
+                last_self_activity, last_reset
+            ) VALUES (?, ?, 'Новичок', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)
         """,
             (user_id, username, today),
         )
@@ -933,75 +959,75 @@ class Database:
 
     def decrease_points_for_inactive(self) -> int:
         """
-        Этот метод отвечает за реализацию уменьшения баллов для неактивных
-        пользователей (т.е. Новичок и Стажёр), а также синхронизирует их
-        ранг с новым количеством баллов — без этого, например, Стажёр,
-        потерявший баллы из-за затухания, навсегда оставался бы со старым
-        рангом/привилегиями/окном неактивности, даже опустившись ниже
-        порога в 10 баллов.
+        Этот метод отвечает за уменьшение баллов неактивных новичков:
+        -1 балл за каждые 24 часа, в течение которых пользователь НЕ
+        писал сообщений И НЕ ставил реакции (полученные реакции не
+        считаются активностью самого пользователя, поэтому здесь
+        используется last_self_activity, а не общий last_activity).
+        Только "Новичок" — по итоговому решению клиента, остальные
+        ранги не затухают вообще. Также синхронизирует ранг с новым
+        количеством баллов после уменьшения.
         Returns:
             int: количество пользователей, у которых уменьшили баллы.
         """
         cursor = self.conn.cursor()
         now = datetime.now()
-        one_hour_ago = now - timedelta(hours=1)
+        one_day_ago = now - timedelta(hours=24)
 
-        # Новички: -0.2 балла в час
         cursor.execute(
             """
                        SELECT user_id FROM users
                        WHERE rank = 'Новичок'
-                         AND last_activity < ?
+                         AND last_self_activity < ?
                        """,
-            (one_hour_ago,),
+            (one_day_ago,),
         )
         novice_ids = [row["user_id"] for row in cursor.fetchall()]
 
         cursor.execute(
             """
                        UPDATE users
-                       SET points = MAX(0, points - 0.2)
+                       SET points = MAX(0, points - 1)
                        WHERE rank = 'Новичок'
-                         AND last_activity < ?
+                         AND last_self_activity < ?
                        """,
-            (one_hour_ago,),
+            (one_day_ago,),
         )
         novice_count = cursor.rowcount
-
-        # Стажёры: -0.1 балла в час
-        cursor.execute(
-            """
-                       SELECT user_id FROM users
-                       WHERE rank = 'Стажёр'
-                         AND last_activity < ?
-                       """,
-            (one_hour_ago,),
-        )
-        intern_ids = [row["user_id"] for row in cursor.fetchall()]
-
-        cursor.execute(
-            """
-                       UPDATE users
-                       SET points = MAX(0, points - 0.1)
-                       WHERE rank = 'Стажёр'
-                         AND last_activity < ?
-                       """,
-            (one_hour_ago,),
-        )
-        intern_count = cursor.rowcount
-
-        affected_rows = novice_count + intern_count
         self.conn.commit()
 
         # Синхронизация ранга с новым количеством баллов после затухания
-        for user_id in novice_ids + intern_ids:
+        for user_id in novice_ids:
             self.update_user_ranks_by_points(user_id)
 
-        logger.info(
-            f"Decreased points for {affected_rows} inactive users: "
-            f"(Новичок: {novice_count}, Стажер: {intern_count})"
-        )
-        return affected_rows
+        logger.info(f"Decreased points for {novice_count} inactive Новичок users")
+        return novice_count
+
+    def record_self_activity(self, user_id: int) -> bool:
+        """
+        Этот метод отмечает момент, когда пользователь САМ что-то
+        сделал (написал сообщение/загрузил музыку/поставил реакцию).
+        Используется отдельно от last_activity, так как last_activity
+        также обновляется при ПОЛУЧЕНИИ реакции — а это не действие
+        самого пользователя и не должно защищать его от затухания
+        баллов за неактивность.
+        Args:
+            user_id (int): ID пользователя.
+        Returns:
+            bool: `True` если успешно, `False` если ошибка.
+        """
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE users SET last_self_activity = CURRENT_TIMESTAMP "
+                "WHERE user_id = ?",
+                (user_id,),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error recording self-activity for user_id={user_id}: {e}")
+            return False
 
     # Дальше методы только для админов
     def reset_inactivity_timer(self, user_id: int) -> bool:

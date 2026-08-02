@@ -177,15 +177,20 @@ async def handle_text_message(
     bot_instance = context.bot_data["bot_instance"]
     db = bot_instance.db
 
-    # Сравнение длины сообщения с минимальным (< 5)
-    text = message.text.strip()
-    if len(text) < POINTS_CONFIG["text_message"]["min_length"]:
-        return
-
     user_data = db.get_user(user.id)
     if not user_data:
         db.create_user(user.id, user.username)
         user_data = db.get_user(user.id)
+
+    # Отмечаем самостоятельную активность до проверок длины/лимита —
+    # для затухания баллов важен сам факт "написал что-то", а не то,
+    # заработало ли это сообщение баллы.
+    db.record_self_activity(user.id)
+
+    # Сравнение длины сообщения с минимальным (< 5)
+    text = message.text.strip()
+    if len(text) < POINTS_CONFIG["text_message"]["min_length"]:
+        return
 
     # Проверка дневного лимита
     today = datetime.now().date()
@@ -261,6 +266,11 @@ async def handle_audio_message(
     if not user_data:
         db.create_user(user.id, user.username)
         user_data = db.get_user(user.id)
+
+    # Отмечаем самостоятельную активность до проверки дневного лимита —
+    # для затухания баллов важен сам факт загрузки, а не то, заработала
+    # ли она баллы.
+    db.record_self_activity(user.id)
 
     today = datetime.now().date()
     last_reset = (
@@ -437,6 +447,11 @@ async def _process_given_reaction(
         if not user_data:
             db.create_user(user_id, username)
             user_data = db.get_user(user_id)
+
+        # Отмечаем самостоятельную активность до проверки дневного
+        # лимита — для затухания баллов важен сам факт постановки
+        # реакции, а не то, заработала ли она баллы.
+        db.record_self_activity(user_id)
 
         # Проверка дневного лимита
         today = datetime.now().date()

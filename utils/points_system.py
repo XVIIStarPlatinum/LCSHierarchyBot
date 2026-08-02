@@ -55,11 +55,13 @@ class PointsSystem:
         self, context: ContextTypes.DEFAULT_TYPE = None
     ) -> None:
         """
-        Уменьшение баллов для неактивных пользователей.
-        Выполняется каждый час:
+        Уменьшение баллов для неактивных Новичков.
+        Выполняется каждые 24 часа:
 
-        - Для ранга 'Новичок': -0.2 балла в час
-        - Для ранга 'Стажёр': -0.1 балла в час
+        - Для ранга 'Новичок': -1 балл за 24 часа без сообщений
+          И реакций (полученные реакции не считаются, см.
+          Database.record_self_activity)
+        - Остальные ранги не затухают (решение клиента)
         Args:
             context (ContextTypes, optional): Контекст приложения.
         """
@@ -117,7 +119,7 @@ class PointsSystem:
         задач. Задача решает следующие проблемы:
 
         - Сброс дневных лимитов каждые 24 часа
-        - Уменьшение баллов для неактивных каждый час
+        - Уменьшение баллов неактивных Новичков каждые 24 часа
 
         Args:
             application (Application): Экземпляр приложения.
@@ -137,22 +139,18 @@ class PointsSystem:
             name="daily_reset",
         )
 
-        # Вычисление времени до начала следующего часа
-        next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-        time_to_next_hour = (next_hour - now).total_seconds()
-
-        # Уменьшение баллов для неактивных каждый час
+        # Уменьшение баллов неактивных Новичков каждые 24 часа
         application.job_queue.run_repeating(
             self.decrease_inactive_points,
             interval=SCHEDULED_TASKS["points_decay"],
-            first=time_to_next_hour,
+            first=time_to_midnight,
             name="points_decay",
         )
 
         logger.info(
-            f"Scheduled tasks registered: daily_reset (24h), points_decay (1h). "
+            f"Scheduled tasks registered: daily_reset (24h), points_decay (24h). "
             f"Next reset at {next_midnight.strftime('%Y-%m-%d %H:%M:%S')}, "
-            f"next decay at {next_hour.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"next decay at {next_midnight.strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
     def __str__(self) -> str:
