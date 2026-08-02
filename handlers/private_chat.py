@@ -34,12 +34,18 @@ async def cleanup_private_chat(
         if not bot_messages:
             return
 
-        bot_messages.sort(key=lambda x: x["timestamp"])
+        # Сортировка по (timestamp, message_id): одного timestamp
+        # (секундная точность SQLite) недостаточно, когда несколько
+        # ответов бота отправлены в течение одной секунды — message_id
+        # используется как надёжный тай-брейкер (строго возрастает
+        # в пределах чата), иначе "последним" мог ошибочно считаться
+        # более старый, а не действительно последний ответ.
+        bot_messages.sort(key=lambda x: (x["timestamp"], x["message_id"]))
 
         messages_to_keep = [bot_messages[-1]]
 
         for msg in bot_messages:
-            if msg.get("is_start_command") == 1:
+            if msg["is_start_command"] == 1:
                 if msg not in messages_to_keep:
                     messages_to_keep.append(msg)
 
@@ -122,29 +128,6 @@ async def handle_post_command_cleanup(
             )
 
 
-async def save_bot_message(
-    update: Update, context: ContextTypes.DEFAULT_TYPE = None
-) -> None:
-    """
-    Сохранение сообщений бота в БД для последующей очистки.
-    Параметр context обязателен для соответствия API
-    python-telegram-bot, но не используется в данной функции.
-    Args:
-        update (Update): Событие обновления состояния.
-        context (ContextTypes, optional): Контекст приложения.
-    """
-    user = update.effective_user
-    message = update.effective_message
-
-    if message.chat.type != "private":
-        return
-
-    bot_instance = context.bot_data["bot_instance"]
-    db = bot_instance.db
-
-    db.save_bot_message(message.message_id, message.chat.id, user.id)
-
-
 def register_handlers(application, bot_instance):
     """
     Эта функция осуществляет регистрацию обработчиков для ЛС.
@@ -160,10 +143,6 @@ def register_handlers(application, bot_instance):
             filters.ChatType.PRIVATE & filters.COMMAND, handle_pre_command_cleanup
         ),
         group=1,
-    )
-
-    application.add_handler(
-        MessageHandler(filters.ChatType.PRIVATE, save_bot_message), group=10
     )
 
     application.add_handler(

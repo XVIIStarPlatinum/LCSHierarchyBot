@@ -65,6 +65,9 @@ class BotInstance:
             logger.info("Initializing Telegram application...")
             self.application = Application.builder().token(TELEGRAM_TOKEN).build()
 
+            logger.info("Patching bot message tracking for DM self-cleanup...")
+            self._patch_bot_message_tracking()
+
             logger.info("Registering handlers...")
             self._register_all_handlers()
 
@@ -84,6 +87,39 @@ class BotInstance:
             logger.critical(f"Critical error during initialization: {ex}")
             await self.shutdown()
             raise
+
+    def _patch_bot_message_tracking(self) -> None:
+        """
+        Этот метод оборачивает `Bot.send_message`, чтобы КАЖДОЕ сообщение,
+        отправленное ботом в ЛС, автоматически сохранялось в
+        bot_messages для последующей самоочистки (см.
+        handlers/private_chat.py). Раньше это делал только
+        /start (единственный явный вызов `db.save_bot_message`), из-за
+        чего ответы всех остальных команд (`/profile`, `/top`, `/add`
+        и т.д.) никогда не попадали в самоочистку и просто копились в
+        переписке. `Message.reply_text(...)`, которым пользуются все
+        обработчики команд, в итоге вызывает именно этот метод бота,
+        поэтому патчить нужно только в одном месте.
+        `save_bot_message` идемпотентен по (message_id, chat_id), так что
+        второй, уже явный вызов в /start (с флагом is_start_command) не
+        создаёт вторую запись — он лишь дополняет уже сохранённую здесь.
+        """
+        bot = self.application.bot
+        original_send_message = bot.send_message
+
+        async def tracked_send_message(chat_id, *args, **kwargs):
+            sent_message = await original_send_message(chat_id, *args, **kwargs)
+            try:
+                if (
+                    sent_message is not None
+                    and getattr(sent_message.chat, "type", None) == "private"
+                ):
+                    self.db.save_bot_message(sent_message.message_id, chat_id, chat_id)
+            except Exception as e:
+                logger.warning(f"Failed to track outgoing DM message: {e}")
+            return sent_message
+
+        bot.send_message = tracked_send_message
 
     def _register_all_handlers(self) -> None:
         """Этот метод регистрирует всех обработчиков в правильном порядке."""

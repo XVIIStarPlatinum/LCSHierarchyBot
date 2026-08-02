@@ -639,6 +639,14 @@ class Database:
     ) -> bool:
         """
         Этот метод сохраняет сообщение бота в ЛС.
+        Идемпотентен по (message_id, chat_id): повторный вызов для того
+        же сообщения не создаёт вторую строку, а лишь при необходимости
+        поднимает флаг is_start_command. Это важно, так как теперь
+        сообщения сохраняются автоматически при каждой отправке (см.
+        bot.py), а /start дополнительно помечает своё же сообщение этим
+        флагом — без идемпотентности одно и то же сообщение получило бы
+        две записи, и непомеченный дубликат мог быть по ошибке удалён
+        при самоочистке несмотря на флаг.
         Args:
             message_id (int): ID сообщения.
             chat_id (int): ID чата.
@@ -650,17 +658,34 @@ class Database:
         cursor = self.conn.cursor()
         try:
             cursor.execute(
-                """
-                INSERT INTO bot_messages (
-                    message_id,
-                    chat_id,
-                    user_id,
-                    is_start_command
-                )
-                VALUES (?, ?, ?, ?)
-            """,
-                (message_id, chat_id, user_id, 1 if is_start_command else 0),
+                "SELECT rowid FROM bot_messages WHERE message_id = ? AND chat_id = ?",
+                (message_id, chat_id),
             )
+            existing = cursor.fetchone()
+
+            if existing:
+                cursor.execute(
+                    """
+                    UPDATE bot_messages
+                    SET is_start_command = MAX(is_start_command, ?)
+                    WHERE rowid = ?
+                """,
+                    (1 if is_start_command else 0, existing["rowid"]),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO bot_messages (
+                        message_id,
+                        chat_id,
+                        user_id,
+                        is_start_command
+                    )
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (message_id, chat_id, user_id, 1 if is_start_command else 0),
+                )
+
             if not getattr(self.conn, "in_transaction", False):
                 self.conn.commit()
             logger.info(
