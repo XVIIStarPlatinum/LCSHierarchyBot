@@ -339,9 +339,6 @@ async def handle_setadmin_command(
     username = username_arg.lstrip("@")
 
     # Поиск пользователя
-    target_user = None
-    all_users = db.get_top_users(1000)
-
     target_user = db.get_user_by_username(username)
 
     # Проверка, не является ли пользователь уже админом
@@ -425,9 +422,6 @@ async def handle_unsetadmin_command(
     username = username_arg.lstrip("@")
 
     # Поиск пользователя
-    target_user = None
-    all_users = db.get_top_users(1000)
-
     target_user = db.get_user_by_username(username)
 
     # Проверка, является ли пользователь админом
@@ -586,9 +580,6 @@ async def handle_reset_command(
     username = username_arg.lstrip("@")
 
     # Поиск пользователя
-    target_user = None
-    all_users = db.get_top_users(1000)
-
     target_user = db.get_user_by_username(username)
 
     # Сброс таймера неактивности
@@ -654,9 +645,6 @@ async def handle_user_profile_command(
     username = username_match.group(1)
 
     # Поиск пользователя
-    target_user = None
-    all_users = db.get_top_users(1000)
-
     target_user = db.get_user_by_username(username)
 
     # Формирование профиля
