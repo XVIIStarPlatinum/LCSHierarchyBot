@@ -880,7 +880,11 @@ class Database:
     def decrease_points_for_inactive(self) -> int:
         """
         Этот метод отвечает за реализацию уменьшения баллов для неактивных
-        пользователей (т.е. Новичок и Стажёр).
+        пользователей (т.е. Новичок и Стажёр), а также синхронизирует их
+        ранг с новым количеством баллов — без этого, например, Стажёр,
+        потерявший баллы из-за затухания, навсегда оставался бы со старым
+        рангом/привилегиями/окном неактивности, даже опустившись ниже
+        порога в 10 баллов.
         Returns:
             int: количество пользователей, у которых уменьшили баллы.
         """
@@ -889,6 +893,16 @@ class Database:
         one_hour_ago = now - timedelta(hours=1)
 
         # Новички: -0.2 балла в час
+        cursor.execute(
+            """
+                       SELECT user_id FROM users
+                       WHERE rank = 'Новичок'
+                         AND last_activity < ?
+                       """,
+            (one_hour_ago,),
+        )
+        novice_ids = [row["user_id"] for row in cursor.fetchall()]
+
         cursor.execute(
             """
                        UPDATE users
@@ -903,6 +917,16 @@ class Database:
         # Стажёры: -0.1 балла в час
         cursor.execute(
             """
+                       SELECT user_id FROM users
+                       WHERE rank = 'Стажёр'
+                         AND last_activity < ?
+                       """,
+            (one_hour_ago,),
+        )
+        intern_ids = [row["user_id"] for row in cursor.fetchall()]
+
+        cursor.execute(
+            """
                        UPDATE users
                        SET points = MAX(0, points - 0.1)
                        WHERE rank = 'Стажёр'
@@ -914,6 +938,11 @@ class Database:
 
         affected_rows = novice_count + intern_count
         self.conn.commit()
+
+        # Синхронизация ранга с новым количеством баллов после затухания
+        for user_id in novice_ids + intern_ids:
+            self.update_user_ranks_by_points(user_id)
+
         logger.info(
             f"Decreased points for {affected_rows} inactive users: "
             f"(Новичок: {novice_count}, Стажер: {intern_count})"
