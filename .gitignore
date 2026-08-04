@@ -25,6 +25,7 @@ share/python-wheels/
 database/
 logs/
 tests/logs/
+test-results/
 .installed.cfg
 *.egg
 MANIFEST
@@ -48,6 +49,7 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+coverage-integration.xml
 *.cover
 *.py.cover
 .hypothesis/
