@@ -9,6 +9,7 @@ from config import (
     LOG_LEVEL,
     OWNER_ID,
     OWNER_USERNAME,
+    RANKS,
 )
 
 COUNTER_MESSAGES = "messages"
@@ -22,26 +23,6 @@ logging.basicConfig(
     handlers=[logging.FileHandler("logs/database.log"), logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
-
-
-def get_rank_requirements(rank_name: str) -> dict:
-    """
-    Эта функция возвращает требования для конкретного ранга.
-    Args:
-        rank_name (str): Название ранга.
-    Returns:
-         dict: Словарь с порогами баллов.
-    """
-    rank_requirements = {
-        "Новичок": {"min_points": 0, "max_points": 9.9},
-        "Стажёр": {"min_points": 10, "max_points": 99.9},
-        "Участник": {"min_points": 100, "max_points": 199.9},
-        "Активист": {"min_points": 200, "max_points": 299.9},
-        "Завсегдатай": {"min_points": 300, "max_points": 499.9},
-        "Представитель": {"min_points": 500, "max_points": 999.9},
-        "Легенда": {"min_points": 1000, "max_points": float("inf")},
-    }
-    return rank_requirements.get(rank_name, {})
 
 
 class Database:
@@ -478,18 +459,19 @@ class Database:
                 logger.debug(f"User {user_id} is a Legend - skipping auto-update.")
                 return False
 
-            if points >= 500:
-                new_rank = "Представитель"
-            elif points >= 300:
-                new_rank = "Завсегдатай"
-            elif points >= 200:
-                new_rank = "Активист"
-            elif points >= 100:
-                new_rank = "Участник"
-            elif points >= 10:
-                new_rank = "Стажёр"
-            else:
-                new_rank = "Новичок"
+            # Ранг определяется по порогам из config.RANKS (единый
+            # источник правды вместо повторного хардкода тех же чисел
+            # здесь). "Легенда" пропускается — она выдаётся только
+            # вручную (см. /legend), не по количеству баллов, поэтому
+            # даже при points значительно выше 999.9 потолком остаётся
+            # "Представитель".
+            new_rank = "Новичок"
+            for rank_info in reversed(RANKS):
+                if rank_info["name"] == "Легенда":
+                    continue
+                if points >= rank_info["min_points"]:
+                    new_rank = rank_info["name"]
+                    break
 
             if new_rank == current_rank:
                 return False
@@ -1184,6 +1166,31 @@ class Database:
             (message_id, chat_id),
         )
         return cursor.fetchone()
+
+    def prune_message_log(self, retention_days: int = 30) -> int:
+        """
+        Этот метод удаляет старые записи из message_log. Таблица нужна
+        только чтобы определить автора сообщения при постановке реакции
+        (см. handle_track_message / get_message_author) — реакция на
+        сообщение старше месяца практически никогда не происходит,
+        поэтому без очистки таблица бы бесконечно росла на весь срок
+        жизни бота.
+        Args:
+            retention_days (int): Сколько дней хранить записи.
+        Returns:
+            int: количество удалённых записей.
+        """
+        cursor = self.conn.cursor()
+        cutoff = datetime.now() - timedelta(days=retention_days)
+        cursor.execute(
+            "DELETE FROM message_log WHERE timestamp < ?",
+            (cutoff.strftime("%Y-%m-%d %H:%M:%S"),),
+        )
+        deleted = cursor.rowcount
+        self.conn.commit()
+        if deleted:
+            logger.info(f"Pruned {deleted} old message_log entries")
+        return deleted
 
     def close(self) -> None:
         """Этот метод закрывает соединения с базой данных."""

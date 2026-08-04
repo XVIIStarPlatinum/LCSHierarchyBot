@@ -1,8 +1,4 @@
 pytest
 python-dotenv
-black==24.3.0
-flake8
-isort
-pyproject-flake8
 python-telegram-bot==22.5
 python-telegram-bot[job-queue]

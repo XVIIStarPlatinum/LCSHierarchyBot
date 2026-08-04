@@ -16,6 +16,18 @@ BOT_USERNAME = os.environ.get("BOT_USERNAME")
 # База данных
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "database/hierarchy.db")
 
+# Гарантируем существование папок для логов и БД до того, как что-либо
+# попытается открыть в них файл. Каждый модуль, который вызывает
+# logging.basicConfig(handlers=[FileHandler("logs/...")]), импортирует
+# config ДО этого вызова — поэтому создание папок здесь, при импорте
+# config, покрывает все 11+ мест разом, вместо повторения в каждом
+# файле. На чистом клоне (logs/ и database/ не в git) без этого первый
+# же `import` любого модуля падал бы с FileNotFoundError.
+os.makedirs("logs", exist_ok=True)
+_database_dir = os.path.dirname(DATABASE_PATH)
+if _database_dir:
+    os.makedirs(_database_dir, exist_ok=True)
+
 # Логирование
 LOG_LEVEL = logging.INFO
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -153,4 +165,5 @@ CACHE_CONFIG = {
     "user_cache_duration": 600,  # 10 минут для обычных пользователей
     "admin_cache_duration": 0,  # 0 секунд = мгновенное обновление
     "owner_cache_duration": 0,  # 0 секунд = мгновенное обновление
+    "profile_cache_max_size": 500,  # Максимум записей в PROFILE_CACHE (LRU)
 }

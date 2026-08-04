@@ -74,6 +74,24 @@ class PointsSystem:
             if context:
                 await notify_owner_error(context, e)
 
+    async def prune_message_log(
+        self, context: ContextTypes.DEFAULT_TYPE = None
+    ) -> None:
+        """
+        Очистка старых записей message_log (см.
+        Database.prune_message_log). Без этого таблица, нужная только
+        для определения автора сообщения при реакции, росла бы вечно.
+        Выполняется каждые 24 часа.
+        Args:
+            context (ContextTypes, optional): Контекст приложения.
+        """
+        try:
+            self.db.prune_message_log()
+        except Exception as e:
+            logger.error(f"Error during message_log pruning: {e}")
+            if context:
+                await notify_owner_error(context, e)
+
     def get_daily_limits_status(self, user_id: int) -> Union[dict[str, Any] | None]:
         """
         Получение статуса дневных лимитов пользователя.
@@ -120,6 +138,7 @@ class PointsSystem:
 
         - Сброс дневных лимитов каждые 24 часа
         - Уменьшение баллов неактивных Новичков каждые 24 часа
+        - Очистка старых записей message_log каждые 24 часа
 
         Args:
             application (Application): Экземпляр приложения.
@@ -147,10 +166,18 @@ class PointsSystem:
             name="points_decay",
         )
 
+        # Очистка старых записей message_log каждые 24 часа
+        application.job_queue.run_repeating(
+            self.prune_message_log,
+            interval=SCHEDULED_TASKS["daily_reset"],
+            first=time_to_midnight,
+            name="message_log_prune",
+        )
+
         logger.info(
-            f"Scheduled tasks registered: daily_reset (24h), points_decay (24h). "
-            f"Next reset at {next_midnight.strftime('%Y-%m-%d %H:%M:%S')}, "
-            f"next decay at {next_midnight.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"Scheduled tasks registered: daily_reset (24h), points_decay (24h), "
+            f"message_log_prune (24h). Next reset at "
+            f"{next_midnight.strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
     def __str__(self) -> str:

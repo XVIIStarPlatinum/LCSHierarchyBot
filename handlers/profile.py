@@ -1,4 +1,5 @@
 import logging
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from typing import Union
 
@@ -18,8 +19,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Глобальные переменные для кэширования
-PROFILE_CACHE = {}
+# Глобальные переменные для кэширования.
+# PROFILE_CACHE держит по одной записи на КАЖДОГО когда-либо запросившего
+# /profile пользователя — без ограничения это неограниченно растущий
+# словарь на весь срок жизни процесса. Используем OrderedDict как простой
+# LRU: при превышении лимита вытесняется давнее всего использованная
+# запись. TOP_CACHE, наоборот, всегда хранит ровно одну запись
+# ("top_users"), так что ограничивать нечего.
+PROFILE_CACHE: "OrderedDict[str, dict]" = OrderedDict()
 TOP_CACHE = {}
 LAST_CACHE_UPDATE = datetime.now()
 
@@ -202,6 +209,7 @@ async def get_cached_profile(
         cached = PROFILE_CACHE[cache_key]
         cache_duration = get_cache_duration(is_admin, is_owner)
         if now - cached["timestamp"] < cache_duration:
+            PROFILE_CACHE.move_to_end(cache_key)  # отмечаем как недавно использованный
             return cached["data"]
 
     # Получение свежих данных
@@ -222,8 +230,12 @@ async def get_cached_profile(
         "position": db.get_user_rank_position(user_id),
     }
 
-    # Сохранение в кэш
+    # Сохранение в кэш (с вытеснением давнего по LRU при превышении лимита)
     PROFILE_CACHE[cache_key] = {"data": profile_data, "timestamp": now}
+    PROFILE_CACHE.move_to_end(cache_key)
+    max_size = CACHE_CONFIG["profile_cache_max_size"]
+    while len(PROFILE_CACHE) > max_size:
+        PROFILE_CACHE.popitem(last=False)
 
     return profile_data
 

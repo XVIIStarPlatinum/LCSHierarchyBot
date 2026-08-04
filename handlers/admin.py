@@ -50,7 +50,6 @@ async def handle_add_command(
 
     bot_instance = context.bot_data["bot_instance"]
     db = bot_instance.db
-    rank_system = bot_instance.rank_system
 
     # Проверка прав
     if user.id != OWNER_ID and not db.is_admin(user.id):
@@ -113,9 +112,9 @@ async def handle_add_command(
             await message.reply_text("❌ Ошибка при обновлении баллов пользователя.")
             return
 
-        # Обновление ранга если необходимо
-        if points > 0:
-            rank_system.update_user_rank(target_user["user_id"])
+        # Ранг уже пересчитан автоматически внутри db.add_points_manually
+        # (через update_user_points -> update_user_ranks_by_points),
+        # поэтому отдельный вызов здесь не нужен.
 
         # Формирование ответа админу
         action = "выдано" if points > 0 else "снято"
