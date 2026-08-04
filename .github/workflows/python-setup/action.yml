@@ -15,4 +15,6 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: ./scripts/install-ci.sh
+      run: |
+        chmod +x ./scripts/install-ci.sh
+        ./scripts/install-ci.sh
