@@ -1,39 +1,42 @@
-name: LCS hierarchy bot pipeline
+name: LCS Hierarchy Bot Pipeline
+description: Complete set of jobs (code style lint + formatting, unit and integration tests) to ensure the correctness of the bot.
+
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 permissions:
-  contents: write
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   lint-format:
-    name: Lint & format
+    name: Lint & Format
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - uses: ./.github/actions/python-setup
 
-      - name: Lint (ruff check)
+      - name: Ruff lint
         run: ruff check .
 
-      - name: Formatting (ruff format)
+      - name: Ruff format
         run: ruff format --check .
 
   unit-tests:
-    name: Unit tests
+    name: Unit Tests
     runs-on: ubuntu-latest
+
     env:
-      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
       DATABASE_PATH: ${{ secrets.DATABASE_PATH }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
@@ -41,37 +44,43 @@ jobs:
       TOPIC_IMPORTANT_ID: ${{ secrets.TOPIC_IMPORTANT_ID }}
       OWNER_ID: ${{ secrets.OWNER_ID }}
       OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - uses: ./.github/actions/python-setup
 
+      - name: Create required directories
+        run: mkdir -p logs database test-results
+
       - name: Run unit tests
-        run: >
-          pytest tests/unit -q
-          --junitxml=test-results/unit.xml
-          --cov=. --cov-report=xml:coverage-unit.xml
+        run: |
+          pytest tests/unit \
+            -q \
+            --maxfail=1 \
+            --junitxml=test-results/unit.xml \
+            --html=test-results/unit.html \
+            --self-contained-html \
+            --cov=. \
+            --cov-report=xml:coverage-unit.xml \
+            --cov-report=html:test-results/coverage-unit
 
-      - name: Upload pytest results
+      - name: Upload unit test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-artifacts-unit
-          path: test-results/
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-unit
-          path: coverage-unit.xml
+          name: unit-test-report
+          path: |
+            test-results/
+            coverage-unit.xml
 
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
+
     env:
-      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
       DATABASE_PATH: ${{ secrets.DATABASE_PATH }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
@@ -79,28 +88,33 @@ jobs:
       TOPIC_IMPORTANT_ID: ${{ secrets.TOPIC_IMPORTANT_ID }}
       OWNER_ID: ${{ secrets.OWNER_ID }}
       OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - uses: ./.github/actions/python-setup
 
+      - name: Create required directories
+        run: mkdir -p logs database test-results
+
       - name: Run integration tests
-        run: >
-          pytest tests/integration -q
-          --junitxml=test-results/integration.xml
-          --cov=. --cov-report=xml:coverage-integration.xml
+        run: |
+          pytest tests/integration \
+            -q \
+            --maxfail=1 \
+            --junitxml=test-results/integration.xml \
+            --html=test-results/integration.html \
+            --self-contained-html \
+            --cov=. \
+            --cov-report=xml:coverage-integration.xml \
+            --cov-report=html:test-results/coverage-integration
 
-      - name: Upload pytest results
+      - name: Upload integration test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-artifacts-integration
-          path: test-results/
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-integration
-          path: coverage-integration.xml
+          name: integration-test-report
+          path: |
+            test-results/
+            coverage-integration.xml
