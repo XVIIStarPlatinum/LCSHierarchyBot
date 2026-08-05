@@ -374,6 +374,6 @@ class TestActivityAntispamIntegration:
 
         # Проверяем, что у каждого пользователя обнаружен спам
         for user_id, spam_count in spam_detected.items():
-            assert (
-                spam_count > 0
-            ), f"Спам должен быть обнаружен для пользователя {user_id}"
+            assert spam_count > 0, (
+                f"Спам должен быть обнаружен для пользователя {user_id}"
+            )

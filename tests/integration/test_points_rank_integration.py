@@ -227,9 +227,9 @@ class TestPointsRankIntegration:
             privileges = rank_system.get_user_privileges(rank_name)
             restrictions = get_user_restrictions(rank_name)
 
-            assert (
-                len(privileges) >= min_privileges
-            ), f"Ранг {rank_name} должен иметь минимум {min_privileges} привилегий"
+            assert len(privileges) >= min_privileges, (
+                f"Ранг {rank_name} должен иметь минимум {min_privileges} привилегий"
+            )
 
             if min_restrictions > 0:
                 assert len(restrictions) >= min_restrictions, (
@@ -237,9 +237,9 @@ class TestPointsRankIntegration:
                     f"{min_restrictions} ограничений"
                 )
             else:
-                assert (
-                    len(restrictions) == 0
-                ), f"Ранг {rank_name} не должен иметь ограничений"
+                assert len(restrictions) == 0, (
+                    f"Ранг {rank_name} не должен иметь ограничений"
+                )
 
     def test_legend_rank_manual_assignment(self, integrated_systems):
         """

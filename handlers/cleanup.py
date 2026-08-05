@@ -389,8 +389,7 @@ class CleanupSystem:
 
         if rank in ["Завсегдатай", "Представитель", "Легенда"]:
             logger.info(
-                "Skipping removal for user with protected rank: "
-                f"{user_id}, rank={rank}"
+                f"Skipping removal for user with protected rank: {user_id}, rank={rank}"
             )
             return True
 

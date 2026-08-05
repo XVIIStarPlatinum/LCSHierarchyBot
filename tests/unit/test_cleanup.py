@@ -193,7 +193,7 @@ class TestCleanupSystem:
             if call[1]["chat_id"] == user_id
         ]
         assert len(owner_notification_calls) > 0, (
-            "Уведомление должно " "быть отправлено владельцу"
+            "Уведомление должно быть отправлено владельцу"
         )
 
         # Проверяем, что уведомление НЕ отправлено в топике 'ВАЖНОЕ'
@@ -249,9 +249,9 @@ class TestCleanupSystem:
             for call in mock_context.bot.send_message.call_args_list
             if call[1]["chat_id"] == OWNER_ID
         ]
-        assert (
-            len(owner_notification_calls) > 0
-        ), "Уведомление об ошибке должно быть отправлено владельцу"
+        assert len(owner_notification_calls) > 0, (
+            "Уведомление об ошибке должно быть отправлено владельцу"
+        )
 
         # Проверяем, что пользователь не помечен для удаления
         mock_bot_instance.db.mark_user_for_deletion.assert_not_called()
@@ -369,9 +369,9 @@ class TestCleanupSystem:
         is_skipped = await cleanup_system.should_skip_removal(
             user_id, rank, last_activity
         )
-        assert (
-            is_skipped is True
-        ), "Пользователь с недавней активностью должен быть пропущен"
+        assert is_skipped is True, (
+            "Пользователь с недавней активностью должен быть пропущен"
+        )
 
         # Пользователь был активен 25 часов назад (более 24 часов)
         last_activity = now - timedelta(hours=25)
@@ -380,9 +380,9 @@ class TestCleanupSystem:
         is_skipped = await cleanup_system.should_skip_removal(
             user_id, rank, last_activity
         )
-        assert (
-            is_skipped is False
-        ), "Пользователь с давней активностью не должен быть пропущен"
+        assert is_skipped is False, (
+            "Пользователь с давней активностью не должен быть пропущен"
+        )
 
     async def test_integration_with_database(self, db, cleanup_system):
         """

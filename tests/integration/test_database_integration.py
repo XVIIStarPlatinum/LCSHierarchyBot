@@ -191,9 +191,7 @@ def test_full_user_lifecycle(integrated_db):
     top_users = integrated_db.get_top_users(10)
     assert len(top_users) <= 10  # Может быть меньше, если пользователь удален
 
-    print(
-        "Топ пользователей обновлен. " f"Всего в топе: {len(top_users)} пользователей"
-    )
+    print(f"Топ пользователей обновлен. Всего в топе: {len(top_users)} пользователей")
 
     # 10. Финальная проверка целостности данных
     cursor.execute("PRAGMA integrity_check")

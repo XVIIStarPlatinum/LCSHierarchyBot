@@ -48,7 +48,6 @@ class Database:
         Конструктор класса взаимодействия с базой данных.
         """
         try:
-
             self.DATABASE_PATH = db_path if db_path is not None else DATABASE_PATH
             self.conn = sqlite3.connect(self.DATABASE_PATH, check_same_thread=False)
             self.conn.row_factory = sqlite3.Row
@@ -867,7 +866,7 @@ class Database:
         # Чтоб не втыкали админам и владельцу
         query = f"""
                     SELECT * FROM users
-                    WHERE ({' OR '.join(conditions)})
+                    WHERE ({" OR ".join(conditions)})
                     AND user_id NOT IN (SELECT user_id FROM admins)
                     AND user_id != ?
                     ORDER BY last_activity

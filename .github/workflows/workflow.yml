@@ -18,6 +18,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - uses: ./.github/actions/python-setup
 
       - name: Lint (ruff check)
@@ -39,6 +42,9 @@ jobs:
       OWNER_ID: ${{ secrets.OWNER_ID }}
       OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - uses: ./.github/actions/python-setup
 
       - name: Run unit tests
@@ -74,6 +80,9 @@ jobs:
       OWNER_ID: ${{ secrets.OWNER_ID }}
       OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - uses: ./.github/actions/python-setup
 
       - name: Run integration tests
