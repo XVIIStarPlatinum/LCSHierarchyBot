@@ -1,5 +1,4 @@
 import os
-import sys
 from datetime import datetime, timedelta
 
 import pytest
@@ -17,26 +16,20 @@ def integrated_db(tmp_path, monkeypatch):
     db_path = str(tmp_path / f"test_{id(tmp_path)}.db")
     monkeypatch.setattr("config.DATABASE_PATH", db_path)
 
-    if "database" in sys.modules:
-        del sys.modules["database"]
-    if "utils.points_system" in sys.modules:
-        del sys.modules["utils.points_system"]
-    if "utils.rank_system" in sys.modules:
-        del sys.modules["utils.rank_system"]
-
     from database import Database
-    from utils.points_system import PointsSystem
-    from utils.rank_system import RankSystem
 
     # Очищаем до теста
     if os.path.exists(db_path):
         os.remove(db_path)
 
-    # Инициализируем базу данных
+    # Инициализируем базу данных (db_path передаётся явно, поэтому
+    # модуль не нужно перезагружать — раньше здесь удалялись и заново
+    # импортировались database/utils.points_system/utils.rank_system
+    # из sys.modules, что создавало ВТОРОЙ объект модуля и приводило к
+    # тому, что patch("utils.points_system.datetime") в другом файле
+    # (test_points_system.py) патчил не тот модуль, если этот тест
+    # выполнялся раньше).
     db = Database(db_path)
-
-    db._PointsSystem = PointsSystem
-    db._RankSystem = RankSystem
 
     yield db
 
