@@ -9,7 +9,15 @@ from telegram.ext import Application, ContextTypes
 
 from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID, TELEGRAM_TOKEN
 from database import Database
-from handlers import activity, admin, antispam, cleanup, private_chat, profile
+from handlers import (
+    activity,
+    admin,
+    antispam,
+    cleanup,
+    navigation,
+    private_chat,
+    profile,
+)
 from utils.points_system import PointsSystem
 from utils.rank_system import RankSystem
 
@@ -128,6 +136,7 @@ class BotInstance:
         private_chat.register_handlers(self.application, self)
         profile.register_handlers(self.application, self)
         admin.register_handlers(self.application, self)
+        navigation.register_handlers(self.application, self)
         cleanup.register_cleanup_task(self.application, self)
         logger.info("All components have been registered successfully")
 
