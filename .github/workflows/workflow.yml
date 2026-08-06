@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
       DATABASE_PATH: ${{ secrets.DATABASE_PATH }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
       DATABASE_PATH: ${{ secrets.DATABASE_PATH }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
