@@ -58,7 +58,6 @@ jobs:
         run: |
           pytest tests/unit \
             -q \
-            --maxfail=1 \
             --junitxml=test-results/unit.xml \
             --html=test-results/unit.html \
             --self-contained-html \
@@ -102,7 +101,6 @@ jobs:
         run: |
           pytest tests/integration \
             -q \
-            --maxfail=1 \
             --junitxml=test-results/integration.xml \
             --html=test-results/integration.html \
             --self-contained-html \
