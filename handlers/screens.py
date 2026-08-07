@@ -18,6 +18,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL
 from utils.helpers import format_rank_with_emoji
+from utils.rank_system import get_user_restrictions
 
 logging.basicConfig(
     format=LOG_FORMAT,
@@ -116,7 +117,7 @@ def render_profile_screen(
     rank_with_emoji = format_rank_with_emoji(profile["rank"])
 
     privileges = rank_system.get_user_privileges(profile["rank"])
-    restrictions = rank_system.get_user_restrictions(profile["rank"])
+    restrictions = get_user_restrictions(profile["rank"])
 
     text = (
         f"👤 <b>Профиль: @{username}</b>\n"

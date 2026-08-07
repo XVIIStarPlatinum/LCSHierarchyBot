@@ -89,3 +89,23 @@ def owner_user(db: Database) -> dict:
 
     # Владелец уже* в таблице админов
     return {"user_id": owner_id, "username": owner_username}
+
+
+@pytest.fixture(autouse=True)
+def clear_profile_caches():
+    """
+    handlers.profile.PROFILE_CACHE/TOP_CACHE — обычные модульные
+    глобальные переменные, живущие на весь процесс, а не на один
+    тест. Ключ кэша — просто "profile_{user_id}", без привязки к
+    конкретному тесту, а TTL (10 минут) намного дольше целого
+    прогона тестов — то есть без очистки запись, созданная одним
+    тестом, могла бы незаметно "утечь" в другой тест с тем же
+    user_id и дать ложно проходящий (или ложно падающий) результат.
+    """
+    from handlers import profile
+
+    profile.PROFILE_CACHE.clear()
+    profile.TOP_CACHE.clear()
+    yield
+    profile.PROFILE_CACHE.clear()
+    profile.TOP_CACHE.clear()

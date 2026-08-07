@@ -9,7 +9,7 @@ from telegram.ext._utils.types import BD
 
 from config import CACHE_CONFIG, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID
 from database import Database
-from utils.helpers import format_rank_with_emoji
+from handlers.screens import render_entrance_hall, render_profile_screen
 
 logging.basicConfig(
     format=LOG_FORMAT,
@@ -95,70 +95,12 @@ async def handle_start_command(
         is_owner = user.id == OWNER_ID
         is_admin = db.is_admin(user.id)
 
-        if is_owner:
-            welcome_prefix = (
-                "🎉 <b>Добро пожаловать, создатель сообщества! "
-                "Доступны команды: /profile, /top, /add, /legend, "
-                "/unlegend, /setadmin, /unsetadmin, /admins, /reset, "
-                "/@username.</b>"
-            )
-        elif is_admin:
-            welcome_prefix = (
-                "🎉 <b>Привет, админ! Управляй сообществом с помощью "
-                "команд: /profile, /top, /add, "
-                "/admins, /reset, /@username.</b>"
-            )
-        else:
-            welcome_prefix = (
-                "🎉 <b>Добро пожаловать в сообщество! Используй /profile"
-                " для просмотра статуса, /top для рейтинга. Будь активным"
-                " и повышай свой ранг!</b>"
-            )
-        welcome_message = welcome_prefix + (
-            "\n\n"
-            "🤖 Я - бот-калькулятор, который помогает отслеживать "
-            "вашу активность и ранг в сообществе.\n\n"
-            "📊 <b>Как это работает:</b>\n"
-            "• За каждое сообщение вы получаете 0.1 балла\n"
-            "• За загрузку музыки (MP3/WAV) - 1.0 балл\n"
-            "• За реакции - 0.1 балла (макс. 33 в день)\n"
-            "• За полученные реакции - 0.2 балла (без лимита)\n\n"
-            "🏆 <b>Ранги в сообществе:</b>\n"
-            "• 🔰 Новичок: 0+ баллов\n"
-            "• 🎗 Стажёр: 10+ баллов\n"
-            "• 🥉 Участник: 100+ баллов\n"
-            "• 🥈 Активист: 200+ баллов\n"
-            "• 🥇 Завсегдатай: 300+ баллов\n"
-            "• 🏆 Представитель: 500+ баллов\n"
-            "• 💎 Легенда: 1000+ баллов\n\n"
-            "💡 <b>Полезные команды:</b>\n"
-            "/profile - посмотреть свой профиль и статистику\n"
-            "/top - топ-100 участников сообщества\n\n"
-            "⚠️ <b>Важно:</b> Если вы не будете активны 24 часа в "
-            "ранге «Новичок», вы будете удалены из чата. "
-            "Регулярная активность поможет вам улучшить "
-            "ранг и получить больше привилегий!\n\n"
-            "🚀 <b>Начните общаться в основном чате, "
-            "чтобы набирать баллы и повышать свой ранг!</b>"
-        )
+        welcome_message, keyboard = render_entrance_hall(is_owner, is_admin)
 
         sent_message = await update.message.reply_text(
             welcome_message,
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            "👀 Посмотреть мой профиль", callback_data="view_profile"
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            "📊 Топ участников", callback_data="view_top"
-                        )
-                    ],
-                ]
-            ),
+            reply_markup=keyboard,
         )
 
         bot_instance = context.bot_data["bot_instance"]
@@ -301,43 +243,12 @@ async def handle_profile_command(
         )
         return
 
-    # Форматирование профиля
-    username = profile["username"] or f"user{user.id}"
-    rank_with_emoji = format_rank_with_emoji(profile["rank"])
-
-    # Получение привилегий и ограничений
-    privileges = rank_system.get_user_privileges(profile["rank"])
-    restrictions = rank_system.get_user_restrictions(profile["rank"])
-
-    profile_text = (
-        f"👤 <b>Профиль: @{username}</b>\n"
-        f"🏆 <b>Ранг:</b> {rank_with_emoji}\n"
-        f"💡 <b>Баллы:</b> {profile['points']:.1f}\n"
-        f"📊 <b>Место:</b> {profile['position']}\n\n"
-        f"🔓 <b>Привилегии:</b>\n"
-    )
-
-    # Формирование списка привилегий
-    if privileges:
-        for i, privilege in enumerate(privileges, 1):
-            profile_text += f"   {i}. {privilege}\n"
-    else:
-        profile_text += "   Нет особых привилегий\n"
-
-    profile_text += "\n🔒 <b>Ограничения:</b>\n"
-
-    # Формирование списка ограничений
-    if restrictions:
-        for i, restriction in enumerate(restrictions, 1):
-            profile_text += f"   {i}. {restriction}\n"
-    else:
-        profile_text += "   Нет ограничений\n"
-
-    # Добавление пояснения
-    profile_text += "\n📝 <b>Будь активным в жизни сообщества и повышай свой ранг!</b>"
+    # Форматирование профиля через общий экран (используется и командой,
+    # и кнопкой "Мой профиль" — см. handlers/navigation.py)
+    profile_text, keyboard = render_profile_screen(profile, rank_system)
 
     # Отправка ответа
-    await message.reply_text(profile_text, parse_mode="HTML")
+    await message.reply_text(profile_text, parse_mode="HTML", reply_markup=keyboard)
 
     # Логирование
     logger.info(f"Profile shown for user_id={user.id}, cached={use_cache}")

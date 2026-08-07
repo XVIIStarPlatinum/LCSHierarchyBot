@@ -30,12 +30,11 @@ def get_user_restrictions(rank_name: str) -> list:
         restrictions.append("Нельзя приглашать участников")
         restrictions.append("Нельзя публиковать медиа (фото, видео, кружочки)")
         restrictions.append("Удаление ботом за 24 часа бездействия")
-        restrictions.append("Баллы уменьшаются на 0.2 каждый час")
+        restrictions.append("-1 балл за каждые 24 часа без сообщений и реакций")
         restrictions.append("Нельзя рекламироваться в сообществе")
 
     elif rank_name == "Стажёр":
         restrictions.append("Удаление ботом за 3 дня бездействия")
-        restrictions.append("Баллы уменьшаются на 0.1 каждый час")
 
     elif rank_name == "Участник":
         restrictions.append("Удаление за 7 дней бездействия")

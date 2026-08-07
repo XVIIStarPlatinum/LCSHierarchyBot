@@ -693,8 +693,7 @@ class Database:
                     (message_id, chat_id, user_id, 1 if is_start_command else 0),
                 )
 
-            if not getattr(self.conn, "in_transaction", False):
-                self.conn.commit()
+            self.conn.commit()
             logger.info(
                 f"Bot message saved: message_id={message_id}, "
                 f"chat_id={chat_id}, user_id={user_id}, "
