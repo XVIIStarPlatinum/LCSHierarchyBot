@@ -21,6 +21,7 @@ from config import (
     TOPIC_ID,
     TOPIC_IMPORTANT_ID,
 )
+from handlers.screens import render_admins_screen
 
 logging.basicConfig(
     format=LOG_FORMAT,
@@ -484,6 +485,45 @@ async def handle_unsetadmin_command(
         await message.reply_text("❌ Произошла ошибка при выполнении команды.")
 
 
+def get_admin_list_lines(db) -> list:
+    """
+    Эта функция получает и форматирует строки со списком
+    администраторов бота (владелец + админы). Используется и
+    командой /admins, и кнопкой "👮 Админы" (см.
+    handlers/navigation.py) — по тому же принципу, что и
+    get_cached_profile/get_cached_top_users в handlers/profile.py:
+    получение данных отдельно от их оформления (render_admins_screen
+    в handlers/screens.py), чтобы оба пути показывали идентичный
+    результат.
+    Args:
+        db: Экземпляр Database.
+    Returns:
+        list: Строки вида "👑 @username (владелец)" / "👮 @username".
+        Если администраторов нет вовсе - список с одной строкой
+        "Нет администраторов".
+    """
+    admins = db.get_all_admins()
+    owner_info = db.get_user(OWNER_ID)
+
+    admin_list = []
+
+    # Добавление владельца
+    if owner_info:
+        owner_username = owner_info["username"] or "ViceMGMT"
+        admin_list.append(f"👑 @{owner_username} (владелец)")
+
+    # Добавление админов
+    for admin in admins:
+        admin_username = admin["username"] or f"user{admin['user_id']}"
+        if admin["user_id"] != OWNER_ID:  # Исключаем владельца если он в таблице admins
+            admin_list.append(f"👮 @{admin_username}")
+
+    if not admin_list:
+        admin_list.append("Нет администраторов")
+
+    return admin_list
+
+
 async def handle_admins_command(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
@@ -512,36 +552,12 @@ async def handle_admins_command(
         return
 
     try:
-        admins = db.get_all_admins()
-        owner_info = db.get_user(OWNER_ID)
+        admin_lines = get_admin_list_lines(db)
+        response_text, keyboard = render_admins_screen(admin_lines)
 
-        if not admins and not owner_info:
-            await message.reply_text("👥 Администраторы не найдены.")
-            return
-
-        # Формирование списка админов
-        admin_list = []
-
-        # Добавление владельца
-        if owner_info:
-            owner_username = owner_info["username"] or "ViceMGMT"
-            admin_list.append(f"👑 @{owner_username} (владелец)")
-
-        # Добавление админов
-        for admin in admins:
-            admin_username = admin["username"] or f"user{admin['user_id']}"
-            if (
-                admin["user_id"] != OWNER_ID
-            ):  # Исключаем владельца если он в таблице admins
-                admin_list.append(f"👮 @{admin_username}")
-
-        if not admin_list:
-            admin_list.append("Нет администраторов")
-
-        # Формирование ответа
-        response_text = "👥 <b>Администраторы:</b>\n" + "\n".join(admin_list)
-
-        await message.reply_text(response_text, parse_mode="HTML")
+        await message.reply_text(
+            response_text, parse_mode="HTML", reply_markup=keyboard
+        )
 
         logger.info(f"Admins list shown to user_id={user.id}")
 

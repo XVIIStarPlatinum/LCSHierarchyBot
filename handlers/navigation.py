@@ -21,8 +21,10 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 from telegram.ext._utils.types import BD
 
 from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID
+from handlers.admin import get_admin_list_lines
 from handlers.profile import get_cached_profile, get_cached_top_users
 from handlers.screens import (
+    render_admins_screen,
     render_entrance_hall,
     render_profile_screen,
     render_top_screen,
@@ -79,6 +81,20 @@ async def handle_navigation_callback(
         elif action == "nav:top":
             top_users = await get_cached_top_users(db, is_admin or is_owner)
             text, keyboard = render_top_screen(top_users)
+
+        elif action == "nav:admins":
+            # Кнопка скрыта от обычных участников в render_entrance_hall,
+            # но, как отмечено в docstring модуля, это не защита доступа
+            # сама по себе — переигранный/подделанный callback_data не
+            # должен давать доступ тому, кому не положено.
+            if not (is_owner or is_admin):
+                await query.answer(
+                    "❌ У вас нет прав для просмотра списка администраторов.",
+                    show_alert=True,
+                )
+                return
+            admin_lines = get_admin_list_lines(db)
+            text, keyboard = render_admins_screen(admin_lines)
 
         else:
             logger.warning(f"Unknown navigation callback_data: {action!r}")

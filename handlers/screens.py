@@ -34,6 +34,10 @@ HOME_BUTTON = InlineKeyboardButton("🏠 Домой", callback_data="nav:home")
 # Кнопки входного зала.
 PROFILE_BUTTON = InlineKeyboardButton("👤 Мой профиль", callback_data="nav:profile")
 TOP_BUTTON = InlineKeyboardButton("🏆 Топ", callback_data="nav:top")
+# Показывается только владельцу/админам (см. render_entrance_hall и
+# проверку прав в handlers/navigation.py — сокрытие кнопки не является
+# защитой доступа само по себе).
+ADMINS_BUTTON = InlineKeyboardButton("👮 Админы", callback_data="nav:admins")
 
 
 def render_entrance_hall(
@@ -96,7 +100,10 @@ def render_entrance_hall(
         "чтобы набирать баллы и повышать свой ранг!</b>"
     )
 
-    keyboard = InlineKeyboardMarkup([[PROFILE_BUTTON, TOP_BUTTON]])
+    buttons = [[PROFILE_BUTTON, TOP_BUTTON]]
+    if is_owner or is_admin:
+        buttons.append([ADMINS_BUTTON])
+    keyboard = InlineKeyboardMarkup(buttons)
     return text, keyboard
 
 
@@ -188,5 +195,23 @@ def render_top_screen(top_users: list) -> Tuple[str, InlineKeyboardMarkup]:
             "мгновенно для админов и владельца</i>"
         )
 
+    keyboard = InlineKeyboardMarkup([[HOME_BUTTON]])
+    return text, keyboard
+
+
+def render_admins_screen(admin_lines: list) -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Экран списка администраторов. `admin_lines` — уже готовые строки
+    вида "👑 @username (владелец)" / "👮 @username" (см.
+    handlers.admin.get_admin_list_lines) — эта функция только
+    оформляет их в единый текст с клавиатурой, по тому же принципу,
+    что и остальные экраны: и команда /admins, и кнопка "👮 Админы"
+    показывают идентичный результат.
+    Args:
+        admin_lines (list): Готовые строки со списком администраторов.
+    Returns:
+        Tuple[str, InlineKeyboardMarkup]: Текст и клавиатура экрана.
+    """
+    text = "👥 <b>Администраторы:</b>\n" + "\n".join(admin_lines)
     keyboard = InlineKeyboardMarkup([[HOME_BUTTON]])
     return text, keyboard

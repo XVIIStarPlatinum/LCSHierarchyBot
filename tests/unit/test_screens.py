@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 from telegram import InlineKeyboardMarkup
 
 from handlers.screens import (
+    render_admins_screen,
     render_entrance_hall,
     render_profile_screen,
     render_top_screen,
@@ -51,6 +52,30 @@ class TestRenderEntranceHall:
         callback_data_values = [btn.callback_data for btn in buttons]
         assert "nav:profile" in callback_data_values
         assert "nav:top" in callback_data_values
+
+    def test_regular_user_has_no_admins_button(self):
+        _, keyboard = render_entrance_hall(is_owner=False, is_admin=False)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        assert "nav:admins" not in callback_data_values
+
+    def test_admin_gets_admins_button(self):
+        _, keyboard = render_entrance_hall(is_owner=False, is_admin=True)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        assert "nav:admins" in callback_data_values
+
+    def test_owner_gets_admins_button(self):
+        _, keyboard = render_entrance_hall(is_owner=True, is_admin=False)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        assert "nav:admins" in callback_data_values
 
     def test_no_dead_view_profile_or_view_top_buttons(self):
         # Регрессия: раньше здесь были view_profile/view_top без
@@ -219,6 +244,30 @@ class TestRenderTopScreen:
         top_users = [{"user_id": 1, "username": "alice", "points": 1.0}]
 
         _, keyboard = render_top_screen(top_users)
+
+        buttons = [btn for row in keyboard.inline_keyboard for btn in row]
+        assert len(buttons) == 1
+        assert buttons[0].callback_data == "nav:home"
+
+
+class TestRenderAdminsScreen:
+    def test_lines_appear_in_order(self):
+        lines = ["👑 @owner (владелец)", "👮 @admin1", "👮 @admin2"]
+
+        text, _ = render_admins_screen(lines)
+
+        assert "👑 @owner (владелец)" in text
+        assert "👮 @admin1" in text
+        assert "👮 @admin2" in text
+        assert text.index("@owner") < text.index("@admin1") < text.index("@admin2")
+
+    def test_no_admins_placeholder_passthrough(self):
+        text, _ = render_admins_screen(["Нет администраторов"])
+
+        assert "Нет администраторов" in text
+
+    def test_keyboard_has_home_button(self):
+        _, keyboard = render_admins_screen(["👑 @owner (владелец)"])
 
         buttons = [btn for row in keyboard.inline_keyboard for btn in row]
         assert len(buttons) == 1

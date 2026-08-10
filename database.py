@@ -113,18 +113,6 @@ class Database:
             self.conn.commit()
             logger.info("Migrated: added last_self_activity column to users")
 
-        if "title_synced_rank" not in existing_columns:
-            # Отслеживает, для какого ранга уже установлена "должность"
-            # (custom_title) в чате — см. handlers/rank_titles.py.
-            # NULL означает "ещё не синхронизировано ни разу". Для уже
-            # существующих строк оставляем NULL, чтобы фоновая задача
-            # синхронизации подобрала их в первом же проходе (текущий
-            # rank всегда != NULL, поэтому строка сразу попадёт в
-            # get_users_needing_title_sync).
-            cursor.execute("ALTER TABLE users ADD COLUMN title_synced_rank TEXT")
-            self.conn.commit()
-            logger.info("Migrated: added title_synced_rank column to users")
-
     def create_tables(self) -> None:
         """
         Этот метод создаёт таблицы для работы бота с базой данных SQLite.
@@ -143,8 +131,7 @@ class Database:
                 messages_today INTEGER DEFAULT 0,
                 music_today INTEGER DEFAULT 0,
                 reactions_given_today INTEGER DEFAULT 0,
-                last_reset        DATE,
-                title_synced_rank TEXT
+                last_reset DATE
             )
         """
         )
@@ -570,67 +557,6 @@ class Database:
                 f"Error updating rank for user_id={user_id}: {str(e)}", exc_info=True
             )
             self.conn.rollback()
-            return False
-
-    def get_users_needing_title_sync(self) -> list:
-        """
-        Этот метод возвращает пользователей, у которых текущий ранг
-        (`rank`) расходится с рангом, для которого в чате в последний
-        раз была установлена "должность" (custom_title, см.
-        `handlers/rank_titles.py`). Используется фоновой задачей
-        синхронизации, а не отдельным вызовом при каждом изменении
-        ранга — изменение ранга происходит из множества мест
-        (`update_user_points`, `decrease_points_for_inactive`,
-        `set_legend_rank` и т.д.), многие из которых работают на
-        уровне БД без доступа к `Bot`/`context`, поэтому синхронизация
-        с Telegram API вынесена в отдельный периодический проход.
-        Владелец и помеченные удалёнными ('УДАЛЕН') исключены — им
-        "должность"-бейдж не нужен.
-        Returns:
-            list: Пользователи, чей `title_synced_rank` не совпадает
-            с текущим `rank`.
-        """
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            SELECT *
-            FROM users
-            WHERE rank != 'УДАЛЕН'
-              AND user_id != ?
-              AND (title_synced_rank IS NULL OR title_synced_rank != rank)
-            """,
-            (OWNER_ID,),
-        )
-        return cursor.fetchall()
-
-    def mark_title_synced(self, user_id: int, rank: str) -> bool:
-        """
-        Этот метод отмечает, что для указанного ранга уже
-        предпринята попытка синхронизации "должности" в чате
-        (независимо от того, успела она реально что-то изменить в
-        Telegram, например для реальных админов/создателя чата, или
-        просто не с кем синхронизировать, например пользователь ещё
-        не состоит в чате) — это предотвращает бесконечные повторные
-        попытки на каждом проходе фоновой задачи для одних и тех же
-        пользователей.
-        Args:
-            user_id (int): ID пользователя.
-            rank (str): Ранг, с которым синхронизация была выполнена
-            (или для которого была принята попытка).
-        Returns:
-            bool: `True` если успешно, `False` если ошибка.
-        """
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute(
-                "UPDATE users SET title_synced_rank = ? WHERE user_id = ?",
-                (rank, user_id),
-            )
-            self.conn.commit()
-            return True
-        except Exception as e:
-            self.conn.rollback()
-            logger.error(f"Error marking title synced for user_id={user_id}: {e}")
             return False
 
     def get_user_rank_position(self, user_id: int) -> int:

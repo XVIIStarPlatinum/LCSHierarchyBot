@@ -146,6 +146,63 @@ async def test_nav_top_empty_list_still_renders_without_crashing():
 
 
 @pytest.mark.asyncio
+async def test_nav_admins_edits_message_for_admin():
+    update = make_update(555, "nav:admins")
+    db = MagicMock()
+    db.is_admin.return_value = True
+    context = make_context(db)
+
+    with patch("handlers.navigation.get_admin_list_lines") as mock_get_lines:
+        mock_get_lines.return_value = ["👑 @owner (владелец)", "👮 @somemod"]
+        await handle_navigation_callback(update, context)
+
+    update.callback_query.answer.assert_called_once()
+    text = update.callback_query.edit_message_text.call_args.args[0]
+    assert "@somemod" in text
+    mock_get_lines.assert_called_once_with(db)
+
+
+@pytest.mark.asyncio
+async def test_nav_admins_edits_message_for_owner():
+    update = make_update(OWNER_ID, "nav:admins")
+    db = MagicMock()
+    db.is_admin.return_value = False
+    context = make_context(db)
+
+    with patch("handlers.navigation.get_admin_list_lines") as mock_get_lines:
+        mock_get_lines.return_value = ["👑 @owner (владелец)"]
+        await handle_navigation_callback(update, context)
+
+    update.callback_query.edit_message_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_nav_admins_rejects_regular_user_with_alert_and_no_edit():
+    """
+    Регрессия ровно на тот сценарий, который описывает
+    test_forged_callback_data_still_gets_real_role_check: даже если
+    кнопка "👮 Админы" никому кроме админов/владельца не показывается,
+    подделанный callback_data не должен давать доступ к списку
+    администраторов.
+    """
+    update = make_update(555, "nav:admins")
+    db = MagicMock()
+    db.is_admin.return_value = False
+    context = make_context(db)
+
+    with patch("handlers.navigation.get_admin_list_lines") as mock_get_lines:
+        await handle_navigation_callback(update, context)
+
+    update.callback_query.answer.assert_called_once()
+    alert_kwargs = update.callback_query.answer.call_args.kwargs
+    alert_text = update.callback_query.answer.call_args.args[0]
+    assert "нет прав" in alert_text.lower()
+    assert alert_kwargs.get("show_alert") is True
+    update.callback_query.edit_message_text.assert_not_called()
+    mock_get_lines.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_unknown_action_answers_without_editing():
     update = make_update(555, "nav:something_that_does_not_exist")
     db = MagicMock()
