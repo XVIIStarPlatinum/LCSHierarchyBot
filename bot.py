@@ -111,23 +111,47 @@ class BotInstance:
         `save_bot_message` идемпотентен по (message_id, chat_id), так что
         второй, уже явный вызов в /start (с флагом is_start_command) не
         создаёт вторую запись — он лишь дополняет уже сохранённую здесь.
-        """
-        bot = self.application.bot
-        original_send_message = bot.send_message
 
-        async def tracked_send_message(chat_id, *args, **kwargs):
-            sent_message = await original_send_message(chat_id, *args, **kwargs)
+        ВАЖНО: начиная с PTB 20, `ExtBot`/`Bot` — это `TelegramObject`
+        с переопределённым `__setattr__`, который запрещает
+        присваивание неприватных атрибутов НА ЭКЗЕМПЛЯРЕ (то есть
+        `bot.send_message = ...` всегда бросает `AttributeError:
+        Attribute 'send_message' of class 'ExtBot' can't be set!` —
+        именно это и валило запуск бота). Присваивание же атрибута
+        КЛАССУ (`type(bot).send_message = ...`) не проходит через этот
+        `__setattr__` (он определён на экземплярах, а не на
+        метаклассе) и работает как обычный monkey-patch метода.
+        Патчим один раз на класс (флаг `_lcs_tracking_patched` на
+        случай повторной инициализации бота в рамках одного процесса,
+        например в тестах) и берём `self` (BotInstance) в замыкание,
+        чтобы получить актуальный `self.db` во время вызова.
+        """
+        bot_cls = type(self.application.bot)
+
+        if getattr(bot_cls, "_lcs_tracking_patched", False):
+            return
+
+        original_send_message = bot_cls.send_message
+        bot_instance = self
+
+        async def tracked_send_message(bot_self, chat_id, *args, **kwargs):
+            sent_message = await original_send_message(
+                bot_self, chat_id, *args, **kwargs
+            )
             try:
                 if (
                     sent_message is not None
                     and getattr(sent_message.chat, "type", None) == "private"
                 ):
-                    self.db.save_bot_message(sent_message.message_id, chat_id, chat_id)
+                    bot_instance.db.save_bot_message(
+                        sent_message.message_id, chat_id, chat_id
+                    )
             except Exception as e:
                 logger.warning(f"Failed to track outgoing DM message: {e}")
             return sent_message
 
-        bot.send_message = tracked_send_message
+        bot_cls.send_message = tracked_send_message
+        bot_cls._lcs_tracking_patched = True
 
     def _register_all_handlers(self) -> None:
         """Этот метод регистрирует всех обработчиков в правильном порядке."""

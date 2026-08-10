@@ -3,7 +3,13 @@ import re
 from datetime import datetime, timedelta
 
 from telegram import Message, Update
-from telegram.ext import Application, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    ApplicationHandlerStop,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 from telegram.ext._utils.types import BD
 
 from config import (
@@ -358,6 +364,15 @@ async def handle_message_with_antispam(
     """
     Эта функция является входной точкой для обработки сообщения
     на обнаружения спамов. Вызывается перед основной обработкой сообщения.
+
+    Регистрируется в group=0, а начисление баллов (`handlers/activity.py`)
+    — в group=1. PTB выполняет группы независимо друг от друга: сам факт
+    удаления спам-сообщения здесь НЕ мешает group=1 начислить баллы за
+    тот же (уже удалённый) `Update` — это два разных прохода по одному
+    и тому же объекту в памяти. Поэтому при обнаружении спама здесь
+    нужно явно поднять `ApplicationHandlerStop`, чтобы прервать
+    обработку этого `Update` во всех последующих группах, а не просто
+    выйти из текущего обработчика.
     Args:
         update (Update): Событие обновления состояния.
         context (ContextTypes): Контекст приложения.
@@ -383,9 +398,11 @@ async def handle_message_with_antispam(
     # Проверка на спам
     is_spam = await antispam.check_spam(update, context)
 
-    # Если спам обнаружен - значит стоп
+    # Если спам обнаружен - прерываем обработку этого Update во всех
+    # последующих группах (в т.ч. начисление баллов в activity.py),
+    # а не только выходим из текущего обработчика.
     if is_spam:
-        return
+        raise ApplicationHandlerStop
     # Ура, сообщение не спам
     logger.debug(
         f"Message={message.message_id} from user={user.id} has passed spam check."

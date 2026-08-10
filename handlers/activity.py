@@ -201,7 +201,7 @@ async def handle_text_message(
     )
 
     if last_reset < today:
-        db.reset_daily_counters()
+        db.reset_daily_counters_for_user(user.id)
 
     if (
         user_data["messages_today"]
@@ -280,7 +280,7 @@ async def handle_audio_message(
     )
 
     if last_reset < today:
-        db.reset_daily_counters()
+        db.reset_daily_counters_for_user(user.id)
 
     if user_data["music_today"] >= POINTS_CONFIG["audio_upload"]["max_files_per_day"]:
         return
@@ -463,7 +463,7 @@ async def _process_given_reaction(
         )
 
         if last_reset < today:
-            db.reset_daily_counters()
+            db.reset_daily_counters_for_user(user.id)
 
         # Начисление баллов (если не превышен лимит)
         if (

@@ -372,6 +372,15 @@ class Database:
     def reset_daily_counters(self) -> bool:
         """
         Этот метод сбрасывает дневные счётчики для всех пользователей.
+        Предназначен для ЕЖЕДНЕВНОЙ ФОНОВОЙ задачи в полночь (см.
+        `utils.points_system.PointsSystem.reset_daily_limits`). Для
+        разового отложенного сброса ОДНОГО пользователя (когда его
+        `last_reset` оказался раньше сегодняшней даты в момент
+        какого-то его действия — сообщение/аудио/реакция — до того,
+        как сработала фоновая задача) используйте
+        `reset_daily_counters_for_user`, а не этот метод: этот сбросит
+        счётчики ВСЕМ пользователям, включая тех, кто уже
+        легитимно исчерпал сегодняшний лимит.
         Returns:
             bool: `True` если успешно, `False` если ошибка.
         """
@@ -396,6 +405,49 @@ class Database:
         except Exception as e:
             self.conn.rollback()
             logger.exception("Failed to reset daily counters: %s", e)
+            return False
+
+    def reset_daily_counters_for_user(self, user_id: int) -> bool:
+        """
+        Этот метод сбрасывает дневные счётчики только для одного
+        пользователя. Используется в обработчиках активности
+        (`handlers/activity.py`) при обнаружении, что `last_reset`
+        этого пользователя раньше сегодняшней даты — то есть фоновая
+        полночная задача (`reset_daily_counters`) ещё не сработала для
+        него, но новый день уже настал. Раньше для этого ошибочно
+        вызывался `reset_daily_counters()` (сброс *всех* пользователей
+        сразу из-за активности *одного*), что могло преждевременно
+        обнулить дневной лимит другим, кто его уже честно исчерпал
+        сегодня.
+        Args:
+            user_id (int): ID пользователя.
+        Returns:
+            bool: `True` если успешно, `False` если ошибка.
+        """
+        cursor = self.conn.cursor()
+        try:
+            today = datetime.now().date().strftime("%Y-%m-%d %H:%M:%S")
+
+            cursor.execute(
+                """
+                UPDATE users
+                SET messages_today        = 0,
+                    music_today           = 0,
+                    reactions_given_today = 0,
+                    last_reset            = ?
+                WHERE user_id = ?
+                """,
+                (today, user_id),
+            )
+
+            self.conn.commit()
+            logger.info(f"Daily counters reset for user_id={user_id} at {today}")
+            return True
+        except Exception as e:
+            self.conn.rollback()
+            logger.exception(
+                "Failed to reset daily counters for user_id=%s: %s", user_id, e
+            )
             return False
 
     def update_user_rank(self, user_id: int, rank: str) -> bool:
