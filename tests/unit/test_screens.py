@@ -6,7 +6,11 @@ from unittest.mock import MagicMock
 
 from telegram import InlineKeyboardMarkup
 
-from handlers.screens import render_entrance_hall, render_profile_screen
+from handlers.screens import (
+    render_entrance_hall,
+    render_profile_screen,
+    render_top_screen,
+)
 
 
 class TestRenderEntranceHall:
@@ -39,12 +43,14 @@ class TestRenderEntranceHall:
         text, _ = render_entrance_hall(is_owner=True, is_admin=True)
         assert "создатель сообщества" in text
 
-    def test_keyboard_has_working_profile_button(self):
+    def test_keyboard_has_working_profile_and_top_buttons(self):
         _, keyboard = render_entrance_hall(is_owner=False, is_admin=False)
 
         buttons = [btn for row in keyboard.inline_keyboard for btn in row]
-        assert len(buttons) == 1
-        assert buttons[0].callback_data == "nav:profile"
+        assert len(buttons) == 2
+        callback_data_values = [btn.callback_data for btn in buttons]
+        assert "nav:profile" in callback_data_values
+        assert "nav:top" in callback_data_values
 
     def test_no_dead_view_profile_or_view_top_buttons(self):
         # Регрессия: раньше здесь были view_profile/view_top без
@@ -156,6 +162,63 @@ class TestRenderProfileScreen:
         rank_system = self._make_rank_system()
 
         _, keyboard = render_profile_screen(profile, rank_system)
+
+        buttons = [btn for row in keyboard.inline_keyboard for btn in row]
+        assert len(buttons) == 1
+        assert buttons[0].callback_data == "nav:home"
+
+
+class TestRenderTopScreen:
+    def test_empty_list_shows_placeholder_text(self):
+        text, _ = render_top_screen([])
+
+        assert "пока пуст" in text
+
+    def test_empty_list_still_has_home_button(self):
+        _, keyboard = render_top_screen([])
+
+        buttons = [btn for row in keyboard.inline_keyboard for btn in row]
+        assert len(buttons) == 1
+        assert buttons[0].callback_data == "nav:home"
+
+    def test_users_listed_in_order_with_points(self):
+        top_users = [
+            {"user_id": 1, "username": "alice", "points": 500.0},
+            {"user_id": 2, "username": "bob", "points": 300.5},
+        ]
+
+        text, _ = render_top_screen(top_users)
+
+        assert "1. @alice - 500.0 баллов" in text
+        assert "2. @bob - 300.5 баллов" in text
+
+    def test_top_three_get_medals(self):
+        top_users = [
+            {"user_id": 1, "username": "first", "points": 100.0},
+            {"user_id": 2, "username": "second", "points": 90.0},
+            {"user_id": 3, "username": "third", "points": 80.0},
+            {"user_id": 4, "username": "fourth", "points": 70.0},
+        ]
+
+        text, _ = render_top_screen(top_users)
+
+        assert "🥇1. @first" in text
+        assert "🥈2. @second" in text
+        assert "🥉3. @third" in text
+        assert "4. @fourth" in text
+        assert "🥇4." not in text
+
+    def test_username_falls_back_to_user_id_when_missing(self):
+        top_users = [{"user_id": 42, "username": None, "points": 10.0}]
+
+        text, _ = render_top_screen(top_users)
+
+        assert "@user42" in text
+
+    def test_keyboard_has_home_button(self):
+        top_users = [{"user_id": 1, "username": "alice", "points": 1.0}]
+
+        _, keyboard = render_top_screen(top_users)
 
         buttons = [btn for row in keyboard.inline_keyboard for btn in row]
         assert len(buttons) == 1

@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 # Кнопка "домой" одинакова на любом экране, кроме самого входного зала.
 HOME_BUTTON = InlineKeyboardButton("🏠 Домой", callback_data="nav:home")
 
+# Кнопки входного зала.
+PROFILE_BUTTON = InlineKeyboardButton("👤 Мой профиль", callback_data="nav:profile")
+TOP_BUTTON = InlineKeyboardButton("🏆 Топ", callback_data="nav:top")
+
 
 def render_entrance_hall(
     is_owner: bool, is_admin: bool
@@ -92,9 +96,7 @@ def render_entrance_hall(
         "чтобы набирать баллы и повышать свой ранг!</b>"
     )
 
-    keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("👤 Мой профиль", callback_data="nav:profile")]]
-    )
+    keyboard = InlineKeyboardMarkup([[PROFILE_BUTTON, TOP_BUTTON]])
     return text, keyboard
 
 
@@ -142,6 +144,49 @@ def render_profile_screen(
         text += "   Нет ограничений\n"
 
     text += "\n📝 <b>Будь активным в жизни сообщества и повышай свой ранг!</b>"
+
+    keyboard = InlineKeyboardMarkup([[HOME_BUTTON]])
+    return text, keyboard
+
+
+def render_top_screen(top_users: list) -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Экран топ-100 участников. `top_users` должен быть уже получен
+    заранее (например, через get_cached_top_users) — эта функция
+    только форматирует данные и не обращается к БД сама, по тому же
+    принципу, что и render_profile_screen: один и тот же экран
+    используется и командой /top (создаёт новое сообщение), и
+    кнопкой "🏆 Топ" (редактирует текущее), поэтому оба пути всегда
+    показывают идентичный результат.
+    Args:
+        top_users (list): Список словарей с ключами user_id,
+        username, points (см. Database.get_top_users).
+    Returns:
+        Tuple[str, InlineKeyboardMarkup]: Текст и клавиатура экрана.
+    """
+    if not top_users:
+        text = "📊 Топ участников пока пуст."
+    else:
+        text = "🏆 <b>Топ-100 участников:</b>\n\n"
+
+        for i, user_data in enumerate(top_users, 1):
+            username = user_data["username"] or f"user{user_data['user_id']}"
+            points = user_data["points"]
+
+            medal = ""
+            if i == 1:
+                medal = "🥇"
+            elif i == 2:
+                medal = "🥈"
+            elif i == 3:
+                medal = "🥉"
+
+            text += f"{medal}{i}. @{username} - {points:.1f} баллов\n"
+
+        text += (
+            "\n<i>Обновление: каждые 10 минут для участников, "
+            "мгновенно для админов и владельца</i>"
+        )
 
     keyboard = InlineKeyboardMarkup([[HOME_BUTTON]])
     return text, keyboard

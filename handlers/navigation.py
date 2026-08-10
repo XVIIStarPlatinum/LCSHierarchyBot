@@ -21,8 +21,12 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 from telegram.ext._utils.types import BD
 
 from config import LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID
-from handlers.profile import get_cached_profile
-from handlers.screens import render_entrance_hall, render_profile_screen
+from handlers.profile import get_cached_profile, get_cached_top_users
+from handlers.screens import (
+    render_entrance_hall,
+    render_profile_screen,
+    render_top_screen,
+)
 
 logging.basicConfig(
     format=LOG_FORMAT,
@@ -71,6 +75,10 @@ async def handle_navigation_callback(
                 await query.answer("Профиль не найден. Напишите /start.")
                 return
             text, keyboard = render_profile_screen(profile, bot_instance.rank_system)
+
+        elif action == "nav:top":
+            top_users = await get_cached_top_users(db, is_admin or is_owner)
+            text, keyboard = render_top_screen(top_users)
 
         else:
             logger.warning(f"Unknown navigation callback_data: {action!r}")

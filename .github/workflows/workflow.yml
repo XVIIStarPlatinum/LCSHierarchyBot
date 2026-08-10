@@ -1,5 +1,4 @@
 name: LCS Hierarchy Bot Pipeline
-description: Complete set of jobs (code style lint + formatting, unit and integration tests) to ensure the correctness of the bot.
 
 on:
   push:

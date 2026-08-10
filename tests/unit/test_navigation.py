@@ -2,7 +2,7 @@
 Тесты диспетчера инлайн-навигации (handlers/navigation.py).
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -104,6 +104,45 @@ async def test_nav_profile_not_found_answers_error_without_editing():
     error_text = update.callback_query.answer.call_args.args[0]
     assert "не найден" in error_text.lower()
     update.callback_query.edit_message_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_nav_top_edits_message_with_top_screen():
+    update = make_update(555, "nav:top")
+    db = MagicMock()
+    db.is_admin.return_value = False
+    context = make_context(db)
+
+    with patch(
+        "handlers.navigation.get_cached_top_users", new_callable=AsyncMock
+    ) as mock_get_top:
+        mock_get_top.return_value = [
+            {"user_id": 1, "username": "alice", "points": 500.0},
+        ]
+        await handle_navigation_callback(update, context)
+
+    update.callback_query.answer.assert_called_once()
+    text = update.callback_query.edit_message_text.call_args.args[0]
+    assert "@alice" in text
+    mock_get_top.assert_awaited_once_with(db, False)
+
+
+@pytest.mark.asyncio
+async def test_nav_top_empty_list_still_renders_without_crashing():
+    update = make_update(555, "nav:top")
+    db = MagicMock()
+    db.is_admin.return_value = False
+    context = make_context(db)
+
+    with patch(
+        "handlers.navigation.get_cached_top_users", new_callable=AsyncMock
+    ) as mock_get_top:
+        mock_get_top.return_value = []
+        await handle_navigation_callback(update, context)
+
+    update.callback_query.answer.assert_called_once()
+    text = update.callback_query.edit_message_text.call_args.args[0]
+    assert "пока пуст" in text
 
 
 @pytest.mark.asyncio

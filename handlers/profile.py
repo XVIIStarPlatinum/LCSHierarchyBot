@@ -9,7 +9,11 @@ from telegram.ext._utils.types import BD
 
 from config import CACHE_CONFIG, LOG_ENCODING, LOG_FORMAT, LOG_LEVEL, OWNER_ID
 from database import Database
-from handlers.screens import render_entrance_hall, render_profile_screen
+from handlers.screens import (
+    render_entrance_hall,
+    render_profile_screen,
+    render_top_screen,
+)
 
 logging.basicConfig(
     format=LOG_FORMAT,
@@ -281,33 +285,12 @@ async def handle_top_command(
     # Получение топ-100
     top_users = await get_cached_top_users(db, is_admin or is_owner)
 
-    if not top_users:
-        await message.reply_text("📊 Топ участников пока пуст.")
-        return
+    # Форматирование топа через общий экран (используется и командой,
+    # и кнопкой "🏆 Топ" — см. handlers/navigation.py). render_top_screen
+    # сам обрабатывает пустой список.
+    top_text, keyboard = render_top_screen(top_users)
 
-    top_text = "🏆 <b>Топ-100 участников:</b>\n\n"
-
-    for i, user_data in enumerate(top_users, 1):
-        username = user_data["username"] or f"user{user_data['user_id']}"
-        points = user_data["points"]
-
-        medal = ""
-        if i == 1:
-            medal = "🥇"
-        elif i == 2:
-            medal = "🥈"
-        elif i == 3:
-            medal = "🥉"
-
-        top_text += f"{medal}{i}. @{username} - {points:.1f} баллов\n"
-
-    cache_info = (
-        "\n<i>Обновление: каждые 10 минут для участников, "
-        "мгновенно для админов и владельца</i>"
-    )
-    top_text += cache_info
-
-    await message.reply_text(top_text, parse_mode="HTML")
+    await message.reply_text(top_text, parse_mode="HTML", reply_markup=keyboard)
 
     logger.info(f"Top shown for user_id={user.id}, cached={use_cache}")
 
