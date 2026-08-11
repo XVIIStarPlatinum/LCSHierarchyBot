@@ -10,6 +10,7 @@ from handlers.screens import (
     render_admins_screen,
     render_entrance_hall,
     render_profile_screen,
+    render_target_profile_screen,
     render_top_screen,
 )
 
@@ -248,6 +249,112 @@ class TestRenderTopScreen:
         buttons = [btn for row in keyboard.inline_keyboard for btn in row]
         assert len(buttons) == 1
         assert buttons[0].callback_data == "nav:home"
+
+    def test_default_has_no_profile_buttons(self):
+        top_users = [{"user_id": 1, "username": "alice", "points": 1.0}]
+
+        _, keyboard = render_top_screen(top_users)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        assert not any(
+            cd.startswith("nav:target_profile:") for cd in callback_data_values
+        )
+
+    def test_can_view_profiles_adds_target_profile_buttons(self):
+        top_users = [
+            {"user_id": 1, "username": "alice", "points": 100.0},
+            {"user_id": 2, "username": "bob", "points": 90.0},
+        ]
+
+        _, keyboard = render_top_screen(top_users, can_view_profiles=True)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        assert "nav:target_profile:1" in callback_data_values
+        assert "nav:target_profile:2" in callback_data_values
+        assert "nav:home" in callback_data_values
+
+    def test_can_view_profiles_caps_at_max_clickable_entries(self):
+        top_users = [
+            {"user_id": i, "username": f"user{i}", "points": float(100 - i)}
+            for i in range(1, 16)
+        ]
+
+        _, keyboard = render_top_screen(top_users, can_view_profiles=True)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        profile_buttons = [
+            cd for cd in callback_data_values if cd.startswith("nav:target_profile:")
+        ]
+        assert len(profile_buttons) == 10
+        assert "nav:target_profile:15" not in callback_data_values
+
+    def test_can_view_profiles_false_ignored_for_regular_users(self):
+        top_users = [{"user_id": 1, "username": "alice", "points": 1.0}]
+
+        _, keyboard = render_top_screen(top_users, can_view_profiles=False)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        assert callback_data_values == ["nav:home"]
+
+
+class TestRenderTargetProfileScreen:
+    def _make_target_user(self, **overrides):
+        target_user = {
+            "user_id": 777,
+            "username": "someone",
+            "rank": "Участник",
+            "points": 150.5,
+            "last_activity": "2026-01-15 12:30:00",
+            "messages_today": 5,
+            "music_today": 1,
+            "reactions_given_today": 3,
+        }
+        target_user.update(overrides)
+        return target_user
+
+    def test_basic_fields_present(self):
+        target_user = self._make_target_user()
+
+        text, _ = render_target_profile_screen(target_user)
+
+        assert "@someone" in text
+        assert "Участник" in text
+        assert "150.5" in text
+        assert "15.01.2026 12:30" in text
+        assert "5" in text
+
+    def test_username_falls_back_to_user_id_when_missing(self):
+        target_user = self._make_target_user(username=None)
+
+        text, _ = render_target_profile_screen(target_user)
+
+        assert "@user777" in text
+
+    def test_malformed_last_activity_does_not_crash(self):
+        target_user = self._make_target_user(last_activity=None)
+
+        text, _ = render_target_profile_screen(target_user)
+
+        assert "неизвестно" in text
+
+    def test_keyboard_has_reset_and_home_buttons(self):
+        target_user = self._make_target_user()
+
+        _, keyboard = render_target_profile_screen(target_user)
+
+        callback_data_values = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+        ]
+        assert "nav:reset:777" in callback_data_values
+        assert "nav:home" in callback_data_values
 
 
 class TestRenderAdminsScreen:

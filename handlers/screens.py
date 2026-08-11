@@ -12,6 +12,7 @@ API или базой данных), которая по уже готовым �
 """
 
 import logging
+from datetime import datetime
 from typing import Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -38,6 +39,12 @@ TOP_BUTTON = InlineKeyboardButton("🏆 Топ", callback_data="nav:top")
 # проверку прав в handlers/navigation.py — сокрытие кнопки не является
 # защитой доступа само по себе).
 ADMINS_BUTTON = InlineKeyboardButton("👮 Админы", callback_data="nav:admins")
+
+# На экране "🏆 Топ" для админов/владельца кликабельны только первые
+# N мест — полноценная клавиатура на все 100 строк была бы абсурдно
+# длинной и бесполезной как UI. Кто нужен за пределами топ-10,
+# по-прежнему ищется через /@username.
+MAX_CLICKABLE_TOP_ENTRIES = 10
 
 
 def render_entrance_hall(
@@ -156,18 +163,27 @@ def render_profile_screen(
     return text, keyboard
 
 
-def render_top_screen(top_users: list) -> Tuple[str, InlineKeyboardMarkup]:
+def render_top_screen(
+    top_users: list, can_view_profiles: bool = False
+) -> Tuple[str, InlineKeyboardMarkup]:
     """
     Экран топ-100 участников. `top_users` должен быть уже получен
     заранее (например, через get_cached_top_users) — эта функция
     только форматирует данные и не обращается к БД сама, по тому же
     принципу, что и render_profile_screen: один и тот же экран
     используется и командой /top (создаёт новое сообщение), и
-    кнопкой "🏆 Топ" (редактирует текущее), поэтому оба пути всегда
+    кнопкой "Топ" (редактирует текущее), поэтому оба пути всегда
     показывают идентичный результат.
     Args:
         top_users (list): Список словарей с ключами user_id,
         username, points (см. Database.get_top_users).
+        can_view_profiles (bool): Разрешено ли пользователю,
+        смотрящему на этот экран, открывать чужие профили (только
+        админы/владелец — см. проверку прав в handlers/navigation.py
+        и spec на /@username). Если True, первые
+        MAX_CLICKABLE_TOP_ENTRIES мест становятся кнопками,
+        открывающими render_target_profile_screen для этого
+        участника.
     Returns:
         Tuple[str, InlineKeyboardMarkup]: Текст и клавиатура экрана.
     """
@@ -195,17 +211,37 @@ def render_top_screen(top_users: list) -> Tuple[str, InlineKeyboardMarkup]:
             "мгновенно для админов и владельца</i>"
         )
 
-    keyboard = InlineKeyboardMarkup([[HOME_BUTTON]])
+        if can_view_profiles:
+            text += (
+                "\n\n👆 <i>Нажмите на участника из списка ниже, "
+                "чтобы открыть его профиль</i>"
+            )
+
+    rows = []
+    if can_view_profiles:
+        for user_data in top_users[:MAX_CLICKABLE_TOP_ENTRIES]:
+            username = user_data["username"] or f"user{user_data['user_id']}"
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        f"👤 @{username}",
+                        callback_data=f"nav:target_profile:{user_data['user_id']}",
+                    )
+                ]
+            )
+    rows.append([HOME_BUTTON])
+
+    keyboard = InlineKeyboardMarkup(rows)
     return text, keyboard
 
 
 def render_admins_screen(admin_lines: list) -> Tuple[str, InlineKeyboardMarkup]:
     """
     Экран списка администраторов. `admin_lines` — уже готовые строки
-    вида "👑 @username (владелец)" / "👮 @username" (см.
+    вида "@username (владелец)" / "@username" (см.
     handlers.admin.get_admin_list_lines) — эта функция только
     оформляет их в единый текст с клавиатурой, по тому же принципу,
-    что и остальные экраны: и команда /admins, и кнопка "👮 Админы"
+    что и остальные экраны: и команда /admins, и кнопка "Админы"
     показывают идентичный результат.
     Args:
         admin_lines (list): Готовые строки со списком администраторов.
@@ -214,4 +250,58 @@ def render_admins_screen(admin_lines: list) -> Tuple[str, InlineKeyboardMarkup]:
     """
     text = "👥 <b>Администраторы:</b>\n" + "\n".join(admin_lines)
     keyboard = InlineKeyboardMarkup([[HOME_BUTTON]])
+    return text, keyboard
+
+
+def render_target_profile_screen(target_user: dict) -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Экран профиля ДРУГОГО участника (аналог текста команды
+    /@username). В отличие от render_profile_screen (свой профиль —
+    ранг с эмодзи, привилегии, ограничения, место в топе), здесь
+    более компактная админская сводка: ранг, баллы, последняя
+    активность, счётчики активности за сегодня — то же самое, что
+    исторически показывала команда /@username.
+
+    Используется командой /@username, переходом с экрана "🏆 Топ"
+    (см. render_top_screen, доступно только админам/владельцу) и
+    после нажатия "Сбросить таймер" — чтобы сразу показать
+    обновлённые данные без повторного вызова команды.
+
+    ВАЖНО: сам этот экран не проверяет права — вызывающий код
+    (handlers/admin.py, handlers/navigation.py) обязан убедиться, что
+    смотрящий — админ/владелец, до того как построить этот экран,
+    точно так же, как и с остальными защищёнными экранами.
+    Args:
+        target_user (dict): Данные пользователя (см. Database.get_user
+        / Database.get_user_by_username).
+    Returns:
+        Tuple[str, InlineKeyboardMarkup]: Текст и клавиатура экрана.
+    """
+    username = target_user["username"] or f"user{target_user['user_id']}"
+    rank = target_user["rank"]
+    points = target_user["points"]
+
+    try:
+        last_activity = datetime.strptime(
+            target_user["last_activity"], "%Y-%m-%d %H:%M:%S"
+        )
+        last_activity_text = last_activity.strftime("%d.%m.%Y %H:%M")
+    except (TypeError, ValueError):
+        last_activity_text = "неизвестно"
+
+    text = (
+        f"👤 <b>@{username}</b>\n"
+        f"🏆 <b>Ранг:</b> {rank}\n"
+        f"⭐ <b>Баллы:</b> {points:.1f}\n"
+        f"🕒 <b>Последняя активность:</b> {last_activity_text}\n\n"
+        f"📊 <b>Сегодня:</b>\n"
+        f"   📝 Сообщений: {target_user['messages_today']}\n"
+        f"   🎵 Музыки: {target_user['music_today']}\n"
+        f"   ❤️ Реакций: {target_user['reactions_given_today']}"
+    )
+
+    reset_button = InlineKeyboardButton(
+        "🔄 Сбросить таймер", callback_data=f"nav:reset:{target_user['user_id']}"
+    )
+    keyboard = InlineKeyboardMarkup([[reset_button], [HOME_BUTTON]])
     return text, keyboard

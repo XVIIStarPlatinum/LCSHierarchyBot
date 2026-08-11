@@ -203,6 +203,121 @@ async def test_nav_admins_rejects_regular_user_with_alert_and_no_edit():
 
 
 @pytest.mark.asyncio
+async def test_nav_target_profile_shows_profile_for_admin():
+    update = make_update(555, "nav:target_profile:777")
+    db = MagicMock()
+    db.is_admin.return_value = True
+    db.get_user.return_value = {
+        "user_id": 777,
+        "username": "someone",
+        "rank": "Участник",
+        "points": 150.5,
+        "last_activity": "2026-01-15 12:30:00",
+        "messages_today": 5,
+        "music_today": 1,
+        "reactions_given_today": 3,
+    }
+    context = make_context(db)
+
+    await handle_navigation_callback(update, context)
+
+    update.callback_query.answer.assert_called_once()
+    text = update.callback_query.edit_message_text.call_args.args[0]
+    assert "@someone" in text
+    db.get_user.assert_called_once_with(777)
+
+
+@pytest.mark.asyncio
+async def test_nav_target_profile_rejects_regular_user():
+    update = make_update(555, "nav:target_profile:777")
+    db = MagicMock()
+    db.is_admin.return_value = False
+    context = make_context(db)
+
+    await handle_navigation_callback(update, context)
+
+    alert_text = update.callback_query.answer.call_args.args[0]
+    assert "нет прав" in alert_text.lower()
+    assert update.callback_query.answer.call_args.kwargs.get("show_alert") is True
+    update.callback_query.edit_message_text.assert_not_called()
+    db.get_user.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_nav_target_profile_not_found():
+    update = make_update(555, "nav:target_profile:777")
+    db = MagicMock()
+    db.is_admin.return_value = True
+    db.get_user.return_value = None
+    context = make_context(db)
+
+    await handle_navigation_callback(update, context)
+
+    error_text = update.callback_query.answer.call_args.args[0]
+    assert "не найден" in error_text.lower()
+    update.callback_query.edit_message_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_nav_reset_resets_timer_and_refreshes_screen_for_admin():
+    update = make_update(555, "nav:reset:777")
+    db = MagicMock()
+    db.is_admin.return_value = True
+    db.get_user.return_value = {
+        "user_id": 777,
+        "username": "someone",
+        "rank": "Участник",
+        "points": 150.5,
+        "last_activity": "2026-01-15 12:30:00",
+        "messages_today": 5,
+        "music_today": 1,
+        "reactions_given_today": 3,
+    }
+    db.reset_inactivity_timer.return_value = True
+    context = make_context(db)
+
+    await handle_navigation_callback(update, context)
+
+    db.reset_inactivity_timer.assert_called_once_with(777)
+    answer_text = update.callback_query.answer.call_args.args[0]
+    assert "@someone" in answer_text
+    assert "сброшен" in answer_text.lower()
+    update.callback_query.edit_message_text.assert_called_once()
+    # Профиль перечитан заново после сброса, а не показан по старым данным.
+    assert db.get_user.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_nav_reset_rejects_regular_user():
+    update = make_update(555, "nav:reset:777")
+    db = MagicMock()
+    db.is_admin.return_value = False
+    context = make_context(db)
+
+    await handle_navigation_callback(update, context)
+
+    assert update.callback_query.answer.call_args.kwargs.get("show_alert") is True
+    update.callback_query.edit_message_text.assert_not_called()
+    db.reset_inactivity_timer.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_nav_reset_handles_db_failure_gracefully():
+    update = make_update(555, "nav:reset:777")
+    db = MagicMock()
+    db.is_admin.return_value = True
+    db.get_user.return_value = {"user_id": 777, "username": "someone"}
+    db.reset_inactivity_timer.return_value = False
+    context = make_context(db)
+
+    await handle_navigation_callback(update, context)
+
+    error_text = update.callback_query.answer.call_args.args[0]
+    assert "ошибка" in error_text.lower()
+    update.callback_query.edit_message_text.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_unknown_action_answers_without_editing():
     update = make_update(555, "nav:something_that_does_not_exist")
     db = MagicMock()

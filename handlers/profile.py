@@ -286,9 +286,11 @@ async def handle_top_command(
     top_users = await get_cached_top_users(db, is_admin or is_owner)
 
     # Форматирование топа через общий экран (используется и командой,
-    # и кнопкой "🏆 Топ" — см. handlers/navigation.py). render_top_screen
+    # и кнопкой "Топ" — см. handlers/navigation.py). render_top_screen
     # сам обрабатывает пустой список.
-    top_text, keyboard = render_top_screen(top_users)
+    top_text, keyboard = render_top_screen(
+        top_users, can_view_profiles=is_admin or is_owner
+    )
 
     await message.reply_text(top_text, parse_mode="HTML", reply_markup=keyboard)
 

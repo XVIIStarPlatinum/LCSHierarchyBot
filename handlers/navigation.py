@@ -27,6 +27,7 @@ from handlers.screens import (
     render_admins_screen,
     render_entrance_hall,
     render_profile_screen,
+    render_target_profile_screen,
     render_top_screen,
 )
 
@@ -62,32 +63,44 @@ async def handle_navigation_callback(
 
     db = bot_instance.db
 
+    # "nav:home" -> base="home", target_id=None
+    # "nav:target_profile:123" -> base="target_profile", target_id=123
+    parts = (action or "").split(":")
+    base = parts[1] if len(parts) > 1 else None
+    target_id = None
+    if len(parts) > 2 and parts[2].lstrip("-").isdigit():
+        target_id = int(parts[2])
+
+    # Заполняется только тем действиям, которым нужно показать
+    # собственный toast-текст (например, подтверждение сброса
+    # таймера) — иначе используется обычный пустой query.answer().
+    answer_text = None
+
     try:
         is_owner = user.id == OWNER_ID
         is_admin = db.is_admin(user.id)
+        can_manage = is_owner or is_admin
 
-        if action == "nav:home":
+        if base == "home":
             text, keyboard = render_entrance_hall(is_owner, is_admin)
 
-        elif action == "nav:profile":
-            profile = await get_cached_profile(
-                user.id, db, is_owner=is_admin or is_owner
-            )
+        elif base == "profile":
+            profile = await get_cached_profile(user.id, db, is_owner=can_manage)
             if not profile:
                 await query.answer("Профиль не найден. Напишите /start.")
                 return
             text, keyboard = render_profile_screen(profile, bot_instance.rank_system)
 
-        elif action == "nav:top":
-            top_users = await get_cached_top_users(db, is_admin or is_owner)
-            text, keyboard = render_top_screen(top_users)
+        elif base == "top":
+            top_users = await get_cached_top_users(db, can_manage)
+            text, keyboard = render_top_screen(top_users, can_view_profiles=can_manage)
 
-        elif action == "nav:admins":
+        elif base == "admins":
             # Кнопка скрыта от обычных участников в render_entrance_hall,
             # но, как отмечено в docstring модуля, это не защита доступа
             # сама по себе — переигранный/подделанный callback_data не
             # должен давать доступ тому, кому не положено.
-            if not (is_owner or is_admin):
+            if not can_manage:
                 await query.answer(
                     "❌ У вас нет прав для просмотра списка администраторов.",
                     show_alert=True,
@@ -96,12 +109,62 @@ async def handle_navigation_callback(
             admin_lines = get_admin_list_lines(db)
             text, keyboard = render_admins_screen(admin_lines)
 
+        elif base == "target_profile" and target_id is not None:
+            # Доступно только с экрана "Топ" для админов/владельца
+            # (см. render_top_screen), но, как и везде здесь, права
+            # перепроверяются заново, а не наследуются от того, что
+            # кнопка была видна.
+            if not can_manage:
+                await query.answer(
+                    "❌ У вас нет прав для просмотра чужих профилей.",
+                    show_alert=True,
+                )
+                return
+            target_user = db.get_user(target_id)
+            if not target_user:
+                await query.answer("Пользователь не найден.")
+                return
+            text, keyboard = render_target_profile_screen(target_user)
+
+        elif base == "reset" and target_id is not None:
+            if not can_manage:
+                await query.answer(
+                    "❌ У вас нет прав для использования этой команды.",
+                    show_alert=True,
+                )
+                return
+            target_user = db.get_user(target_id)
+            if not target_user:
+                await query.answer("Пользователь не найден.")
+                return
+
+            success = db.reset_inactivity_timer(target_id)
+            if not success:
+                await query.answer("❌ Ошибка при сбросе таймера неактивности.")
+                return
+
+            username = target_user["username"] or f"user{target_id}"
+            answer_text = f"✅ Таймер неактивности для @{username} сброшен."
+
+            # Перечитываем пользователя, чтобы экран сразу показал
+            # обновлённое время последней активности, а не устаревшее.
+            target_user = db.get_user(target_id)
+            text, keyboard = render_target_profile_screen(target_user)
+
+            logger.info(
+                f"Inactivity timer reset via button: admin_id={user.id}, "
+                f"target_user_id={target_id}"
+            )
+
         else:
             logger.warning(f"Unknown navigation callback_data: {action!r}")
             await query.answer("Неизвестное действие.")
             return
 
-        await query.answer()
+        if answer_text:
+            await query.answer(answer_text)
+        else:
+            await query.answer()
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
 
         logger.info(f"Navigation '{action}' rendered for user_id={user.id}")

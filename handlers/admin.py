@@ -1,6 +1,5 @@
 import logging
 import re
-from datetime import datetime
 
 from telegram import Update
 from telegram.ext import (
@@ -21,7 +20,7 @@ from config import (
     TOPIC_ID,
     TOPIC_IMPORTANT_ID,
 )
-from handlers.screens import render_admins_screen
+from handlers.screens import render_admins_screen, render_target_profile_screen
 
 logging.basicConfig(
     format=LOG_FORMAT,
@@ -680,25 +679,11 @@ async def handle_user_profile_command(
 
     # Формирование профиля
     try:
-        rank = target_user["rank"]
-        points = target_user["points"]
-        last_activity = datetime.strptime(
-            target_user["last_activity"], "%Y-%m-%d %H:%M:%S"
-        )
+        target_profile_text, keyboard = render_target_profile_screen(target_user)
 
-        profile_text = (
-            f"👤 <b>@{username}</b>\n"
-            f"🏆 <b>Ранг:</b> {rank}\n"
-            f"⭐ <b>Баллы:</b> {points:.1f}\n"
-            "🕒 <b>Последняя активность:</b> "
-            f"{last_activity.strftime('%d.%m.%Y %H:%M')}\n\n"
-            f"📊 <b>Сегодня:</b>\n"
-            f"   📝 Сообщений: {target_user['messages_today']}\n"
-            f"   🎵 Музыки: {target_user['music_today']}\n"
-            f"   ❤️ Реакций: {target_user['reactions_given_today']}"
+        await message.reply_text(
+            target_profile_text, parse_mode="HTML", reply_markup=keyboard
         )
-
-        await message.reply_text(profile_text, parse_mode="HTML")
 
         logger.info(
             f"User profile shown: requested_by={user.id}, "
